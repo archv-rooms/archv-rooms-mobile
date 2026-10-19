@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Animated,
+  Pressable,
+  Image,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,21 +17,127 @@ import api, { TOKEN_KEY } from '../services/api';
 import { MODO_TESTE, JOGOS_TESTE } from '../services/mock';
 
 const TABS = ['Recent', 'Games', 'Saves'];
+const NATIVO = Platform.OS !== 'web';
 
 // Cartões de exemplo, usados só se a API não responder
-const EXEMPLOS = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({
+const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
   id: 'exemplo-' + n,
   title: 'Game ' + n,
   exemplo: true,
 }));
 
+// Cor da etiqueta de cada console
+const COR_CONSOLE = {
+  NES: '#E4504D',
+  SNES: '#8E7CF0',
+  SFC: '#8E7CF0',
+  MD: '#3F8CFF',
+  'MEGA DRIVE': '#3F8CFF',
+  GB: '#5FBF6B',
+  GBC: '#5FBF6B',
+  GBA: '#B06CF0',
+  N64: '#F0A63C',
+  PS1: '#9AA3B5',
+  PSX: '#9AA3B5',
+};
+
+function corDoConsole(nome) {
+  return COR_CONSOLE[(nome || '').toUpperCase()] || '#6A5E85';
+}
+
+// Cartão com animação de entrada e "apertinho" ao tocar
+function CartaoJogo({ jogo, indice, onPress }) {
+  const entrada = useRef(new Animated.Value(0)).current;
+  const escala = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.timing(entrada, {
+      toValue: 1,
+      duration: 450,
+      delay: indice * 90,
+      useNativeDriver: NATIVO,
+    }).start();
+  }, []);
+
+  function apertar() {
+    Animated.spring(escala, { toValue: 0.94, useNativeDriver: NATIVO }).start();
+  }
+
+  function soltar() {
+    Animated.spring(escala, { toValue: 1, friction: 4, useNativeDriver: NATIVO }).start();
+  }
+
+  const deslizar = entrada.interpolate({ inputRange: [0, 1], outputRange: [30, 0] });
+  const cor = corDoConsole(jogo.console);
+  const inicial = (jogo.title || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <Animated.View
+      style={[
+        styles.cardWrap,
+        { opacity: entrada, transform: [{ translateY: deslizar }, { scale: escala }] },
+      ]}
+    >
+      <Pressable onPress={onPress} onPressIn={apertar} onPressOut={soltar}>
+        <View style={styles.card}>
+          {jogo.image ? (
+            <Image source={{ uri: jogo.image }} style={styles.cardImage} />
+          ) : (
+            <LinearGradient
+              colors={[cor + '55', 'rgba(30,24,48,0.2)']}
+              style={styles.cardImage}
+            >
+              <Text style={[styles.cardInicial, { color: cor }]}>{inicial}</Text>
+            </LinearGradient>
+          )}
+
+          {jogo.console ? (
+            <View style={[styles.badge, { backgroundColor: cor }]}>
+              <Text style={styles.badgeText}>{jogo.console}</Text>
+            </View>
+          ) : null}
+
+          <View style={styles.cardRodape}>
+            <Text style={styles.cardText} numberOfLines={2}>
+              {jogo.title}
+            </Text>
+            <Ionicons name="play-circle" size={22} color={cor} />
+          </View>
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('Recent');
-  const [menuOpen, setMenuOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [games, setGames] = useState(EXEMPLOS);
   const [erro, setErro] = useState('');
 
+  const menuAnim = useRef(new Animated.Value(0)).current;
+  const tituloAnim = useRef(new Animated.Value(0)).current;
+
   const showCards = activeTab === 'Recent' || activeTab === 'Games';
+  const lista = Array.isArray(games) ? games : [];
+
+  // Título entra com fade
+  useEffect(() => {
+    Animated.timing(tituloAnim, {
+      toValue: 1,
+      duration: 600,
+      useNativeDriver: NATIVO,
+    }).start();
+  }, []);
+
+  // Menu abre e fecha com animação
+  useEffect(() => {
+    Animated.timing(menuAnim, {
+      toValue: menuOpen ? 1 : 0,
+      duration: 220,
+      useNativeDriver: NATIVO,
+    }).start();
+  }, [menuOpen]);
 
   useEffect(() => {
     async function carregarJogos() {
@@ -32,16 +148,16 @@ export default function HomeScreen({ navigation }) {
       try {
         const res = await api.get('/games');
         const corpo = res.data;
-        let lista = [];
+        let resultado = [];
         if (Array.isArray(corpo)) {
-          lista = corpo;
+          resultado = corpo;
         } else if (corpo && Array.isArray(corpo.data)) {
-          lista = corpo.data;
+          resultado = corpo.data;
         } else if (corpo && corpo.data && Array.isArray(corpo.data.games)) {
-          lista = corpo.data.games;
+          resultado = corpo.data.games;
         }
-        if (lista.length > 0) {
-          setGames(lista);
+        if (resultado.length > 0) {
+          setGames(resultado);
         }
         setErro('');
       } catch (e) {
@@ -87,9 +203,17 @@ export default function HomeScreen({ navigation }) {
     navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
   }
 
+  const menuDeslizar = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
+
   return (
     <LinearGradient colors={['#1E1830', '#3A2F55', '#5B4A7A']} style={{ flex: 1 }}>
       <View style={styles.container}>
+        {/* Título */}
+        <Animated.View style={[styles.tituloBox, { opacity: tituloAnim }]}>
+          <Text style={styles.titulo}>ARCHV ROOMS</Text>
+          <Text style={styles.subtitulo}>your space — your game</Text>
+        </Animated.View>
+
         {/* Abas + botão do menu */}
         <View style={styles.header}>
           <View style={styles.tabs}>
@@ -99,12 +223,14 @@ export default function HomeScreen({ navigation }) {
                 style={[styles.tab, activeTab === tab && styles.tabActive]}
                 onPress={() => setActiveTab(tab)}
               >
-                <Text style={styles.tabText}>{tab}</Text>
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                  {tab}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <TouchableOpacity onPress={() => setMenuOpen(!menuOpen)}>
+          <TouchableOpacity onPress={() => setMenuOpen(!menuOpen)} style={styles.menuBotao}>
             <Ionicons name="ellipsis-vertical" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -118,50 +244,53 @@ export default function HomeScreen({ navigation }) {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           >
-            {games.map((jogo) => (
-              <TouchableOpacity
-                key={String(jogo.id)}
-                style={styles.card}
+            {/* key com a aba faz os cartões animarem de novo ao trocar de aba */}
+            {lista.map((jogo, i) => (
+              <CartaoJogo
+                key={activeTab + String(jogo.id)}
+                jogo={jogo}
+                indice={i}
                 onPress={() => abrirJogo(jogo)}
-              >
-                <Text style={styles.cardText} numberOfLines={2}>
-                  {jogo.title}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
         ) : (
           <View style={styles.empty}>
+            <Ionicons name="save-outline" size={40} color="#B8B0C8" />
             <Text style={styles.emptyText}>No saves yet</Text>
           </View>
         )}
 
         {/* Menu */}
-        {menuOpen && (
-          <View style={styles.menuWrapper}>
-            <View style={styles.menu}>
-              <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuText}>Load Rooms</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuText}>Settings</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuText}>www.archvrooms</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem}>
-                <Text style={styles.menuText}>About archvrooms</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.menu, styles.exitBox]}
-              onPress={handleExit}
-            >
-              <Text style={styles.menuText}>Exit</Text>
+        <Animated.View
+          style={[
+            styles.menuWrapper,
+            {
+              opacity: menuAnim,
+              transform: [{ translateY: menuDeslizar }],
+              pointerEvents: menuOpen ? 'auto' : 'none',
+            },
+          ]}
+        >
+          <View style={styles.menu}>
+            <TouchableOpacity style={styles.menuItem}>
+              <Text style={styles.menuText}>Load Rooms</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem}>
+              <Text style={styles.menuText}>Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem}>
+              <Text style={styles.menuText}>www.archvrooms</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem}>
+              <Text style={styles.menuText}>About archvrooms</Text>
             </TouchableOpacity>
           </View>
-        )}
+
+          <TouchableOpacity style={[styles.menu, styles.exitBox]} onPress={handleExit}>
+            <Text style={styles.menuText}>Exit</Text>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
     </LinearGradient>
   );
@@ -171,9 +300,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 50,
     paddingBottom: 20,
+  },
+  tituloBox: {
+    marginBottom: 18,
+  },
+  titulo: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 3,
+  },
+  subtitulo: {
+    color: '#B8B0C8',
+    fontSize: 12,
+    letterSpacing: 1,
+    marginTop: 2,
   },
   header: {
     flexDirection: 'row',
@@ -183,19 +327,27 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: 'row',
     backgroundColor: 'rgba(75, 65, 99, 0.6)',
-    borderBottomWidth: 2,
-    borderBottomColor: '#5B4FD6',
+    borderRadius: 10,
+    padding: 3,
   },
   tab: {
     paddingHorizontal: 14,
     paddingVertical: 8,
+    borderRadius: 8,
   },
   tabActive: {
     backgroundColor: '#6A5E85',
   },
   tabText: {
-    color: '#fff',
+    color: '#B8B0C8',
     fontSize: 14,
+  },
+  tabTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  menuBotao: {
+    padding: 6,
   },
   erro: {
     color: '#FF9AA8',
@@ -207,26 +359,63 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   listContent: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
     paddingBottom: 20,
   },
-  card: {
-    width: 140,
-    height: 64,
-    backgroundColor: 'rgba(75, 65, 99, 0.7)',
+  cardWrap: {
+    width: '48%',
     marginBottom: 14,
+  },
+  card: {
+    backgroundColor: 'rgba(75, 65, 99, 0.7)',
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  cardImage: {
+    height: 80,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+  },
+  cardInicial: {
+    fontSize: 38,
+    fontWeight: '800',
+  },
+  badge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  cardRodape: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    gap: 6,
   },
   cardText: {
-    color: '#D8D0E8',
+    flex: 1,
+    color: '#EDE8F7',
     fontSize: 13,
-    textAlign: 'center',
+    fontWeight: '600',
   },
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
   },
   emptyText: {
     color: '#B8B0C8',
@@ -234,16 +423,18 @@ const styles = StyleSheet.create({
   },
   menuWrapper: {
     position: 'absolute',
-    top: 100,
-    right: 24,
+    top: 130,
+    right: 20,
     width: 190,
   },
   menu: {
-    backgroundColor: 'rgba(75, 65, 99, 0.95)',
+    backgroundColor: 'rgba(75, 65, 99, 0.97)',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   menuItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   menuText: {
     color: '#fff',
@@ -251,7 +442,7 @@ const styles = StyleSheet.create({
   },
   exitBox: {
     marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
 });

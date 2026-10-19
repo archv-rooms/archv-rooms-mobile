@@ -160,9 +160,7 @@ export default function GameScreen({ navigation, route }) {
         {mostrarCarregando && (
           <View style={styles.carregando}>
             <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.carregandoTitulo}>
-              {game.title}
-            </Text>
+            <Text style={styles.carregandoTitulo}>{game.title}</Text>
             <Text style={styles.carregandoTexto}>Carregando jogo...</Text>
           </View>
         )}
