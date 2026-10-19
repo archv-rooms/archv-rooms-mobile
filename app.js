@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import SignInScreen from './src/screens/sign-in';
+import SignUpScreen from './src/screens/sign-up';
+import ForgotPasswordScreen from './src/screens/forgot-password';
+import HomeScreen from './src/screens/home';
+import { TOKEN_KEY } from './src/services/api';
 
 const Stack = createNativeStackNavigator();
 
@@ -18,16 +23,41 @@ function PlaceholderScreen({ route }) {
 }
 
 export default function App() {
+  const [checking, setChecking] = useState(true);
+  const [initialRoute, setInitialRoute] = useState('SignIn');
+
+  useEffect(() => {
+    async function checkToken() {
+      try {
+        const token = await AsyncStorage.getItem(TOKEN_KEY);
+        setInitialRoute(token ? 'Home' : 'SignIn');
+      } catch (e) {
+        setInitialRoute('SignIn');
+      } finally {
+        setChecking(false);
+      }
+    }
+    checkToken();
+  }, []);
+
+  if (checking) {
+    return (
+      <View style={styles.placeholder}>
+        <ActivityIndicator color="#fff" size="large" />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="SignIn"
+        initialRouteName={initialRoute}
         screenOptions={{ headerShown: false }}
       >
         <Stack.Screen name="SignIn" component={SignInScreen} />
-        <Stack.Screen name="SignUp" component={PlaceholderScreen} />
-        <Stack.Screen name="ForgotPassword" component={PlaceholderScreen} />
-        <Stack.Screen name="Home" component={PlaceholderScreen} />
+        <Stack.Screen name="SignUp" component={SignUpScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Onboarding" component={PlaceholderScreen} />
       </Stack.Navigator>
     </NavigationContainer>

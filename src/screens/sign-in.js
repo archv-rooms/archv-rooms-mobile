@@ -7,14 +7,67 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api, { TOKEN_KEY } from '../services/api';
 
 export default function SignInScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleLogin() {
+    if (loading) return;
+
+    if (!email.trim() || !password) {
+      setError('Preencha o e-mail e a senha.');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      // timeout maior porque a API pode demorar ~1 minuto para "acordar"
+      const response = await api.post(
+        '/auth/login',
+        { email: email.trim(), password },
+        { timeout: 90000 }
+      );
+
+      const token = response?.data?.data?.token;
+
+      if (!token) {
+        setError('Resposta inesperada do servidor. Tente novamente.');
+        return;
+      }
+
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+
+      // reset para o usuário não voltar ao login ao apertar "voltar"
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message;
+
+      if (apiMessage) {
+        // mensagens da API (usuário não encontrado, senha inválida, etc.)
+        setError(apiMessage);
+      } else if (err?.code === 'ECONNABORTED') {
+        setError('O servidor demorou para responder. Tente novamente.');
+      } else {
+        setError(
+          'Não foi possível conectar ao servidor. Se for a primeira vez, aguarde um minuto e tente de novo.'
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <LinearGradient colors={['#1E1830', '#3A2F55', '#5B4A7A']} style={{ flex: 1 }}>
@@ -41,6 +94,7 @@ export default function SignInScreen({ navigation }) {
           onChangeText={setEmail}
           autoCapitalize="none"
           keyboardType="email-address"
+          editable={!loading}
         />
 
         {/* Senha */}
@@ -53,6 +107,8 @@ export default function SignInScreen({ navigation }) {
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
             autoCapitalize="none"
+            editable={!loading}
+            onSubmitEditing={handleLogin}
           />
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
             <Ionicons
@@ -63,16 +119,28 @@ export default function SignInScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
+        {/* Mensagem de erro */}
+        {error !== '' && <Text style={styles.error}>{error}</Text>}
+
         {/* Botão entrar */}
         <TouchableOpacity
-          style={styles.loginButton}
-          onPress={() => navigation.navigate('Home')}
+          style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
         >
-          <Text style={styles.loginText}>Log in</Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.loginText}>Log in</Text>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
           <Text style={styles.forgot}>Forgot Password</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+          <Text style={styles.createAccount}>Create account</Text>
         </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
@@ -127,12 +195,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     height: '100%',
   },
+  error: {
+    color: '#FF9AA8',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
   loginButton: {
     backgroundColor: '#5A4E75',
     borderRadius: 26,
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   loginText: {
     color: '#fff',
@@ -142,6 +219,12 @@ const styles = StyleSheet.create({
     color: '#9A90B0',
     textAlign: 'center',
     marginTop: 18,
+    fontSize: 13,
+  },
+  createAccount: {
+    color: '#9A90B0',
+    textAlign: 'center',
+    marginTop: 14,
     fontSize: 13,
   },
   googleButton: {
