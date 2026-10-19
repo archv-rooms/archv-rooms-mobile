@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
+import { MODO_TESTE } from '../services/mock';
 
 export default function SignUpScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -44,6 +45,14 @@ export default function SignUpScreen({ navigation }) {
     setError('');
     setSuccess(false);
     setLoading(true);
+
+    // Modo teste: finge que criou a conta, sem chamar a API
+    if (MODO_TESTE) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setLoading(false);
+      setSuccess(true);
+      return;
+    }
 
     try {
       // timeout maior porque a API pode demorar para "acordar"

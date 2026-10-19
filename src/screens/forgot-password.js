@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
+import { MODO_TESTE } from '../services/mock';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -31,6 +32,14 @@ export default function ForgotPasswordScreen({ navigation }) {
     setError('');
     setSent(false);
     setLoading(true);
+
+    // Modo teste: finge que enviou o link, sem chamar a API
+    if (MODO_TESTE) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setLoading(false);
+      setSent(true);
+      return;
+    }
 
     try {
       // timeout maior porque a API pode demorar para "acordar"

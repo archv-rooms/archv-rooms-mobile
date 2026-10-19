@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { TOKEN_KEY } from '../services/api';
+import { MODO_TESTE } from '../services/mock';
 
 export default function SignInScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -31,6 +32,14 @@ export default function SignInScreen({ navigation }) {
 
     setError('');
     setLoading(true);
+
+    // Modo teste: aceita qualquer login, sem chamar a API
+    if (MODO_TESTE) {
+      await AsyncStorage.setItem(TOKEN_KEY, 'token-de-teste');
+      setLoading(false);
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      return;
+    }
 
     try {
       // timeout maior porque a API pode demorar ~1 minuto para "acordar"
