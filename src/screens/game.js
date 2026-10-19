@@ -1,5 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  StatusBar,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -43,6 +52,15 @@ function montarHtml(game) {
   window.EJS_gameUrl = ${url};
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
   window.EJS_startOnLoaded = true;
+  // Avisa o app quando o jogo realmente começou
+  window.EJS_onGameStart = function () {
+    var msg = 'ejs-game-started';
+    if (window.ReactNativeWebView) {
+      window.ReactNativeWebView.postMessage(msg);
+    } else {
+      window.parent.postMessage(msg, '*');
+    }
+  };
 </script>
 <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
 </body>
@@ -51,6 +69,27 @@ function montarHtml(game) {
 
 export default function GameScreen({ navigation, route }) {
   const game = (route && route.params && route.params.game) || null;
+  const { width, height } = useWindowDimensions();
+  const deitado = width > height;
+  const [carregando, setCarregando] = useState(true);
+
+  // Na web: escuta o aviso que vem de dentro do iframe
+  useEffect(() => {
+    if (Platform.OS !== 'web') return undefined;
+    function aoReceber(evento) {
+      if (evento.data === 'ejs-game-started') {
+        setCarregando(false);
+      }
+    }
+    window.addEventListener('message', aoReceber);
+    return () => window.removeEventListener('message', aoReceber);
+  }, []);
+
+  // Segurança: se o aviso nunca chegar, tira a tela de carregando depois de 25s
+  useEffect(() => {
+    const timer = setTimeout(() => setCarregando(false), 25000);
+    return () => clearTimeout(timer);
+  }, []);
 
   function voltar() {
     if (navigation.canGoBack()) {
@@ -73,6 +112,7 @@ export default function GameScreen({ navigation, route }) {
       srcDoc: montarHtml(game),
       title: game.title || 'Jogo',
       allow: 'autoplay; fullscreen; gamepad',
+      allowFullScreen: true,
       style: { flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: '#000' },
     });
   } else {
@@ -86,21 +126,54 @@ export default function GameScreen({ navigation, route }) {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
+        onMessage={(e) => {
+          if (e.nativeEvent.data === 'ejs-game-started') {
+            setCarregando(false);
+          }
+        }}
       />
     );
   }
 
+  const mostrarCarregando = carregando && game && game.fileUrl;
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={voltar} style={styles.botaoVoltar}>
-          <Ionicons name="arrow-back" size={26} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.titulo} numberOfLines={1}>
-          {game ? game.title : 'Jogo'}
-        </Text>
+      <StatusBar hidden={deitado} />
+
+      {/* Em pé: barra de título normal */}
+      {!deitado && (
+        <View style={styles.header}>
+          <TouchableOpacity onPress={voltar} style={styles.botaoVoltar}>
+            <Ionicons name="arrow-back" size={26} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.titulo} numberOfLines={1}>
+            {game ? game.title : 'Jogo'}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.area}>
+        {conteudo}
+
+        {/* Tela de carregando por cima do emulador */}
+        {mostrarCarregando && (
+          <View style={styles.carregando}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={styles.carregandoTitulo}>
+              {game.title}
+            </Text>
+            <Text style={styles.carregandoTexto}>Carregando jogo...</Text>
+          </View>
+        )}
       </View>
-      <View style={styles.area}>{conteudo}</View>
+
+      {/* Deitado: tela cheia, só um botão de voltar por cima */}
+      {deitado && (
+        <TouchableOpacity onPress={voltar} style={styles.voltarFlutuante}>
+          <Ionicons name="arrow-back" size={22} color="#fff" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -108,7 +181,7 @@ export default function GameScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1E1830',
+    backgroundColor: '#000',
   },
   header: {
     flexDirection: 'row',
@@ -134,6 +207,36 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  carregando: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#1E1830',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  carregandoTitulo: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  carregandoTexto: {
+    color: '#B8B0C8',
+    fontSize: 14,
+    marginTop: 6,
+  },
+  voltarFlutuante: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   centro: {
     flex: 1,
