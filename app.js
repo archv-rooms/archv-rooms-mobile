@@ -8,6 +8,7 @@ import SignInScreen from './src/screens/sign-in';
 import SignUpScreen from './src/screens/sign-up';
 import ForgotPasswordScreen from './src/screens/forgot-password';
 import HomeScreen from './src/screens/home';
+import GameScreen from './src/screens/game';
 import { TOKEN_KEY } from './src/services/api';
 
 const Stack = createNativeStackNavigator();
@@ -58,6 +59,7 @@ export default function App() {
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Game" component={GameScreen} />
         <Stack.Screen name="Onboarding" component={PlaceholderScreen} />
       </Stack.Navigator>
     </NavigationContainer>
