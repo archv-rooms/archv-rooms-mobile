@@ -31,8 +31,23 @@ export const JOGOS_TESTE = [
     console: 'NES',
     fileUrl: BASE + '/streetFighterII.nes',
   },
-  { id: 't1', title: 'Super Mario World', console: 'SNES', exemplo: true },
-  { id: 't2', title: 'Contra', console: 'NES', exemplo: true },
-  { id: 't3', title: 'Sonic The Hedgehog', console: 'MD', exemplo: true },
-  { id: 't4', title: 'Pokémon Red', console: 'GB', exemplo: true },
+  {
+    id: 't8',
+    title: 'Mortal Kombat',
+    console: 'SFC',
+    fileUrl: BASE + '/kombat.sfc',
+  },
+  {
+    id: 't9',
+    title: 'Metroid II Return of Samus',
+    console: 'SFC',
+    fileUrl: BASE + '/MetroidII-Return-of-Samus.gb',
+  },
+  {
+    id: 't10',
+    title: 'Super Mario World',
+    console: 'SFC',
+    fileUrl: BASE + '/Super-Mario-World.sfc',
+  },
+
 ];
