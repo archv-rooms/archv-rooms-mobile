@@ -10,6 +10,7 @@ import ForgotPasswordScreen from './src/screens/forgot-password';
 import HomeScreen from './src/screens/home';
 import GameScreen from './src/screens/game';
 import { TOKEN_KEY } from './src/services/api';
+import { MODO_TESTE } from './src/services/mock';
 
 const Stack = createNativeStackNavigator();
 
@@ -31,9 +32,9 @@ export default function App() {
     async function checkToken() {
       try {
         const token = await AsyncStorage.getItem(TOKEN_KEY);
-        setInitialRoute(token ? 'Home' : 'SignIn');
+        setInitialRoute(token || MODO_TESTE ? 'Home' : 'SignIn');
       } catch (e) {
-        setInitialRoute('SignIn');
+        setInitialRoute(MODO_TESTE ? 'Home' : 'SignIn');
       } finally {
         setChecking(false);
       }

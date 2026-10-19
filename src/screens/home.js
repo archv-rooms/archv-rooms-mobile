@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { TOKEN_KEY } from '../services/api';
+import { MODO_TESTE, JOGOS_TESTE } from '../services/mock';
 
 const TABS = ['Recent', 'Games', 'Saves'];
 
@@ -24,6 +25,10 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     async function carregarJogos() {
+      if (MODO_TESTE) {
+        setGames(JOGOS_TESTE);
+        return;
+      }
       try {
         const res = await api.get('/games');
         const corpo = res.data;
