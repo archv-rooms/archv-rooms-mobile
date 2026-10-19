@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,87 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 import { MODO_TESTE } from '../services/mock';
+
+const NATIVO = Platform.OS !== 'web';
+
+// Bloco que entra deslizando de baixo, com atraso
+function Entrada({ atraso = 0, children }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 500,
+      delay: atraso,
+      useNativeDriver: NATIVO,
+    }).start();
+  }, []);
+
+  const deslizar = anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+
+  return (
+    <Animated.View style={{ opacity: anim, transform: [{ translateY: deslizar }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// Botão com "apertinho"
+function BotaoAnimado({ onPress, disabled, style, children }) {
+  const escala = useRef(new Animated.Value(1)).current;
+
+  return (
+    <Animated.View style={{ transform: [{ scale: escala }] }}>
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        onPressIn={() =>
+          Animated.spring(escala, { toValue: 0.95, useNativeDriver: NATIVO }).start()
+        }
+        onPressOut={() =>
+          Animated.spring(escala, { toValue: 1, friction: 4, useNativeDriver: NATIVO }).start()
+        }
+        style={style}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// Mensagem de sucesso que aparece com fade
+function Sucesso({ onIrLogin }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: NATIVO,
+    }).start();
+  }, []);
+
+  return (
+    <Animated.View style={[styles.sucessoBox, { opacity: anim }]}>
+      <Ionicons name="checkmark-circle" size={22} color="#9BE7B0" />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.success}>
+          Conta criada! Verifique seu e-mail para ativar a conta antes de entrar.
+        </Text>
+        <TouchableOpacity onPress={onIrLogin}>
+          <Text style={styles.goLogin}>Go to Log In</Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
 
 export default function SignUpScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -26,6 +102,34 @@ export default function SignUpScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [foco, setFoco] = useState('');
+
+  const tituloAnim = useRef(new Animated.Value(0)).current;
+  const tremer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(tituloAnim, {
+      toValue: 1,
+      duration: 700,
+      useNativeDriver: NATIVO,
+    }).start();
+  }, []);
+
+  // Balança o formulário quando dá erro
+  function balancar() {
+    Animated.sequence([
+      Animated.timing(tremer, { toValue: 8, duration: 60, useNativeDriver: NATIVO }),
+      Animated.timing(tremer, { toValue: -8, duration: 60, useNativeDriver: NATIVO }),
+      Animated.timing(tremer, { toValue: 6, duration: 60, useNativeDriver: NATIVO }),
+      Animated.timing(tremer, { toValue: -6, duration: 60, useNativeDriver: NATIVO }),
+      Animated.timing(tremer, { toValue: 0, duration: 60, useNativeDriver: NATIVO }),
+    ]).start();
+  }
+
+  function mostrarErro(mensagem) {
+    setError(mensagem);
+    balancar();
+  }
 
   const showBirthInfo = () => {
     Alert.alert(
@@ -38,7 +142,7 @@ export default function SignUpScreen({ navigation }) {
     if (loading) return;
 
     if (!name.trim() || !username.trim() || !email.trim() || !password) {
-      setError('Preencha nome, username, e-mail e senha.');
+      mostrarErro('Preencha nome, username, e-mail e senha.');
       return;
     }
 
@@ -71,11 +175,11 @@ export default function SignUpScreen({ navigation }) {
       const apiMessage = err?.response?.data?.message;
 
       if (apiMessage) {
-        setError(apiMessage);
+        mostrarErro(apiMessage);
       } else if (err?.code === 'ECONNABORTED') {
-        setError('O servidor demorou para responder. Tente novamente.');
+        mostrarErro('O servidor demorou para responder. Tente novamente.');
       } else {
-        setError('Não foi possível conectar ao servidor. Tente novamente.');
+        mostrarErro('Não foi possível conectar ao servidor. Tente novamente.');
       }
     } finally {
       setLoading(false);
@@ -102,115 +206,137 @@ export default function SignUpScreen({ navigation }) {
             <Ionicons name="arrow-back" size={26} color="#fff" />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Create Account</Text>
+          {/* Título */}
+          <Animated.View style={[styles.tituloBox, { opacity: tituloAnim }]}>
+            <Text style={styles.marca}>ARCHV ROOMS</Text>
+            <Text style={styles.title}>Create Account</Text>
+          </Animated.View>
 
-          {/* Nome */}
-          <TextInput
-            style={styles.input}
-            placeholder="Name"
-            placeholderTextColor="#B8B0C8"
-            value={name}
-            onChangeText={setName}
-            editable={!loading}
-          />
-
-          {/* Username */}
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor="#B8B0C8"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            editable={!loading}
-          />
-
-          {/* Data de nascimento (não é enviada para a API) */}
-          <View style={styles.fieldBox}>
-            <TextInput
-              style={styles.fieldInput}
-              placeholder="Date of Birth"
-              placeholderTextColor="#B8B0C8"
-              value={birthDate}
-              onChangeText={setBirthDate}
-              keyboardType="numbers-and-punctuation"
-              editable={!loading}
-            />
-            <TouchableOpacity onPress={showBirthInfo}>
-              <Ionicons name="information-circle-outline" size={22} color="#E6E0F0" />
-            </TouchableOpacity>
-          </View>
-
-          {/* Email */}
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#B8B0C8"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={!loading}
-          />
-
-          {/* Senha */}
-          <View style={styles.fieldBox}>
-            <TextInput
-              style={styles.fieldInput}
-              placeholder="Password"
-              placeholderTextColor="#B8B0C8"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              editable={!loading}
-              onSubmitEditing={handleSignUp}
-            />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Ionicons
-                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={22}
-                color="#E6E0F0"
+          <Animated.View style={{ transform: [{ translateX: tremer }] }}>
+            {/* Nome */}
+            <Entrada atraso={100}>
+              <TextInput
+                style={[styles.input, foco === 'nome' && styles.inputFoco]}
+                placeholder="Name"
+                placeholderTextColor="#B8B0C8"
+                value={name}
+                onChangeText={setName}
+                onFocus={() => setFoco('nome')}
+                onBlur={() => setFoco('')}
+                editable={!loading}
               />
-            </TouchableOpacity>
-          </View>
+            </Entrada>
 
-          {/* Mensagens */}
-          {error !== '' && <Text style={styles.error}>{error}</Text>}
+            {/* Username */}
+            <Entrada atraso={180}>
+              <TextInput
+                style={[styles.input, foco === 'username' && styles.inputFoco]}
+                placeholder="Username"
+                placeholderTextColor="#B8B0C8"
+                value={username}
+                onChangeText={setUsername}
+                onFocus={() => setFoco('username')}
+                onBlur={() => setFoco('')}
+                autoCapitalize="none"
+                editable={!loading}
+              />
+            </Entrada>
 
-          {success && (
-            <View>
-              <Text style={styles.success}>
-                Conta criada! Verifique seu e-mail para ativar a conta antes de entrar.
-              </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
-                <Text style={styles.goLogin}>Go to Log In</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            {/* Data de nascimento (não é enviada para a API) */}
+            <Entrada atraso={260}>
+              <View style={[styles.fieldBox, foco === 'nascimento' && styles.inputFoco]}>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="Date of Birth"
+                  placeholderTextColor="#B8B0C8"
+                  value={birthDate}
+                  onChangeText={setBirthDate}
+                  onFocus={() => setFoco('nascimento')}
+                  onBlur={() => setFoco('')}
+                  keyboardType="numbers-and-punctuation"
+                  editable={!loading}
+                />
+                <TouchableOpacity onPress={showBirthInfo}>
+                  <Ionicons name="information-circle-outline" size={22} color="#E6E0F0" />
+                </TouchableOpacity>
+              </View>
+            </Entrada>
 
-          {/* Botão cadastrar */}
-          <TouchableOpacity
-            style={[styles.signUpButton, loading && styles.buttonDisabled]}
-            onPress={handleSignUp}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.signUpText}>Sign up</Text>
-            )}
-          </TouchableOpacity>
+            {/* Email */}
+            <Entrada atraso={340}>
+              <TextInput
+                style={[styles.input, foco === 'email' && styles.inputFoco]}
+                placeholder="Email"
+                placeholderTextColor="#B8B0C8"
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setFoco('email')}
+                onBlur={() => setFoco('')}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+            </Entrada>
+
+            {/* Senha */}
+            <Entrada atraso={420}>
+              <View style={[styles.fieldBox, foco === 'senha' && styles.inputFoco]}>
+                <TextInput
+                  style={styles.fieldInput}
+                  placeholder="Password"
+                  placeholderTextColor="#B8B0C8"
+                  value={password}
+                  onChangeText={setPassword}
+                  onFocus={() => setFoco('senha')}
+                  onBlur={() => setFoco('')}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                  onSubmitEditing={handleSignUp}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={22}
+                    color="#E6E0F0"
+                  />
+                </TouchableOpacity>
+              </View>
+            </Entrada>
+
+            {/* Mensagens */}
+            {error !== '' && <Text style={styles.error}>{error}</Text>}
+
+            {success && <Sucesso onIrLogin={() => navigation.navigate('SignIn')} />}
+
+            {/* Botão cadastrar */}
+            <Entrada atraso={500}>
+              <BotaoAnimado
+                onPress={handleSignUp}
+                disabled={loading}
+                style={[styles.signUpButton, loading && styles.buttonDisabled]}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.signUpText}>Sign up</Text>
+                )}
+              </BotaoAnimado>
+            </Entrada>
+          </Animated.View>
 
           {/* Termos */}
-          <Text style={styles.terms}>
-            By continuing, you agree to our Terms and Privacy Policy.
-          </Text>
+          <Entrada atraso={580}>
+            <Text style={styles.terms}>
+              By continuing, you agree to our Terms and Privacy Policy.
+            </Text>
 
-          {/* Google */}
-          <TouchableOpacity style={styles.googleButton}>
-            <Text style={styles.googleText}>Continue with Google</Text>
-          </TouchableOpacity>
+            {/* Google */}
+            <TouchableOpacity style={styles.googleButton}>
+              <Ionicons name="logo-google" size={18} color="#fff" />
+              <Text style={styles.googleText}>Continue with Google</Text>
+            </TouchableOpacity>
+          </Entrada>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -229,11 +355,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     width: 40,
   },
+  tituloBox: {
+    marginBottom: 24,
+  },
+  marca: {
+    color: '#B8B0C8',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 3,
+    marginBottom: 6,
+  },
   title: {
     color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 20,
+    fontSize: 28,
+    fontWeight: '700',
   },
   input: {
     backgroundColor: '#4B4163',
@@ -242,6 +377,11 @@ const styles = StyleSheet.create({
     height: 52,
     color: '#fff',
     marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  inputFoco: {
+    borderColor: '#8E7CF0',
   },
   fieldBox: {
     backgroundColor: '#4B4163',
@@ -251,6 +391,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
   },
   fieldInput: {
     flex: 1,
@@ -263,21 +405,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 14,
   },
+  sucessoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: 'rgba(155, 231, 176, 0.12)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
   success: {
     color: '#9BE7B0',
     fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   goLogin: {
     color: '#fff',
     fontSize: 13,
-    textAlign: 'center',
     textDecorationLine: 'underline',
-    marginBottom: 14,
   },
   signUpButton: {
-    backgroundColor: '#5A4E75',
+    backgroundColor: '#6A5BD6',
     borderRadius: 26,
     height: 52,
     alignItems: 'center',
@@ -289,23 +437,27 @@ const styles = StyleSheet.create({
   signUpText: {
     color: '#fff',
     fontSize: 15,
+    fontWeight: '600',
   },
   terms: {
-    color: '#9A90B0',
+    color: '#B8B0C8',
     textAlign: 'center',
     fontSize: 11,
     marginTop: 14,
     marginBottom: 16,
   },
   googleButton: {
-    backgroundColor: '#5A4E75',
-    borderRadius: 26,
-    height: 52,
+    alignSelf: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#5A4E75',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
   },
   googleText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
   },
 });
