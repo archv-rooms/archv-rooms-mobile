@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Animated,
   Pressable,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -168,9 +169,13 @@ export default function SignInScreen({ navigation }) {
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </TouchableOpacity>
 
-        {/* Título */}
+        {/* Logo + Título */}
         <Animated.View style={[styles.tituloBox, { opacity: tituloAnim }]}>
-          <Text style={styles.marca}>ARCHV ROOMS</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.title}>Log In</Text>
         </Animated.View>
 
@@ -275,12 +280,11 @@ const styles = StyleSheet.create({
   tituloBox: {
     marginBottom: 24,
   },
-  marca: {
-    color: '#B8B0C8',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 3,
-    marginBottom: 6,
+  logo: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+    marginBottom: 12,
   },
   title: {
     color: '#fff',
