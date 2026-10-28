@@ -6,18 +6,25 @@ import {
   ScrollView,
   StyleSheet,
   Animated,
+  Easing,
   Pressable,
   Image,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
+import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { TOKEN_KEY } from '../services/api';
 import { MODO_TESTE, JOGOS_TESTE } from '../services/mock';
 
 const TABS = ['Recent', 'Games', 'Saves'];
 const NATIVO = Platform.OS !== 'web';
+const TEXTO = 'Rajdhani_500Medium';
+const TEXTO_SEMI = 'Rajdhani_600SemiBold';
+const TEXTO_BOLD = 'Rajdhani_700Bold';
+const ACENTO = '#9B8CFF';
 
 // Cartões de exemplo, usados só se a API não responder
 const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
@@ -26,83 +33,146 @@ const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
   exemplo: true,
 }));
 
-// Cor da etiqueta de cada console
+// Cor de cada console (só um pontinho discreto)
 const COR_CONSOLE = {
-  NES: '#E4504D',
-  SNES: '#8E7CF0',
-  SFC: '#8E7CF0',
+  NES: '#FF4D4D',
+  SNES: '#9B8CFF',
+  SFC: '#9B8CFF',
   MD: '#3F8CFF',
   'MEGA DRIVE': '#3F8CFF',
-  GB: '#5FBF6B',
-  GBC: '#5FBF6B',
-  GBA: '#B06CF0',
-  N64: '#F0A63C',
+  GB: '#7CE06B',
+  GBC: '#7CE06B',
+  GBA: '#C77CFF',
+  N64: '#FFB23C',
   PS1: '#9AA3B5',
   PSX: '#9AA3B5',
 };
 
 function corDoConsole(nome) {
-  return COR_CONSOLE[(nome || '').toUpperCase()] || '#6A5E85';
+  return COR_CONSOLE[(nome || '').toUpperCase()] || '#8E7CF0';
 }
 
-// Cartão com animação de entrada e "apertinho" ao tocar
+// Letras de "ARCHV ROOMS" flutuando no fundo
+const TEXTO_LETRAS = 'ARCHVROOMS';
+const QTD_LETRAS = 40;
+
+// Número "aleatório" fixo, para as letras não mudarem de lugar a cada render
+function pseudo(n) {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+const LETRAS = Array.from({ length: QTD_LETRAS }, (_, i) => ({
+  l: TEXTO_LETRAS[i % TEXTO_LETRAS.length],
+  top: pseudo(i + 1) * 94 + '%',
+  left: pseudo(i + 101) * 92 + '%',
+  tam: 16 + Math.round(pseudo(i + 201) * 20),
+  rot: Math.round(pseudo(i + 301) * 40 - 20) + 'deg',
+  amp: 5 + Math.round(pseudo(i + 401) * 7),
+  dur: 3500 + Math.round(pseudo(i + 501) * 3000),
+  op: 0.1 + pseudo(i + 601) * 0.12,
+}));
+
+function LetraFlutuante({ config }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: config.dur,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: NATIVO,
+        }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: config.dur,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: NATIVO,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const subir = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -config.amp] });
+
+  return (
+    <Animated.Text
+      style={{
+        position: 'absolute',
+        top: config.top,
+        left: config.left,
+        fontFamily: TEXTO_BOLD,
+        fontSize: config.tam,
+        color: ACENTO,
+        opacity: config.op,
+        transform: [{ translateY: subir }, { rotate: config.rot }],
+      }}
+    >
+      {config.l}
+    </Animated.Text>
+  );
+}
+
+function FundoLetras() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {LETRAS.map((cfg, i) => (
+        <LetraFlutuante key={i} config={cfg} />
+      ))}
+    </View>
+  );
+}
+
 function CartaoJogo({ jogo, indice, onPress }) {
   const entrada = useRef(new Animated.Value(0)).current;
-  const escala = useRef(new Animated.Value(1)).current;
+  const [imagemFalhou, setImagemFalhou] = useState(false);
 
   useEffect(() => {
     Animated.timing(entrada, {
       toValue: 1,
-      duration: 450,
-      delay: indice * 90,
+      duration: 350,
+      delay: indice * 60,
       useNativeDriver: NATIVO,
     }).start();
   }, []);
 
-  function apertar() {
-    Animated.spring(escala, { toValue: 0.94, useNativeDriver: NATIVO }).start();
-  }
-
-  function soltar() {
-    Animated.spring(escala, { toValue: 1, friction: 4, useNativeDriver: NATIVO }).start();
-  }
-
-  const deslizar = entrada.interpolate({ inputRange: [0, 1], outputRange: [30, 0] });
   const cor = corDoConsole(jogo.console);
   const inicial = (jogo.title || '?').trim().charAt(0).toUpperCase();
+  const temImagem = jogo.image && !imagemFalhou;
 
   return (
-    <Animated.View
-      style={[
-        styles.cardWrap,
-        { opacity: entrada, transform: [{ translateY: deslizar }, { scale: escala }] },
-      ]}
-    >
-      <Pressable onPress={onPress} onPressIn={apertar} onPressOut={soltar}>
-        <View style={styles.card}>
-          {jogo.image ? (
-            <Image source={{ uri: jogo.image }} style={styles.cardImage} />
-          ) : (
-            <LinearGradient
-              colors={[cor + '55', 'rgba(30,24,48,0.2)']}
-              style={styles.cardImage}
-            >
-              <Text style={[styles.cardInicial, { color: cor }]}>{inicial}</Text>
-            </LinearGradient>
-          )}
+    <Animated.View style={[styles.cardWrap, { opacity: entrada }]}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+      >
+        {temImagem ? (
+          <Image
+            source={{ uri: jogo.image }}
+            style={styles.cardImage}
+            fadeDuration={0}
+            onError={() => setImagemFalhou(true)}
+          />
+        ) : (
+          <View style={[styles.cardImage, styles.cardSemImagem, { backgroundColor: cor + '26' }]}>
+            <Text style={[styles.cardInicial, { color: cor }]}>{inicial}</Text>
+          </View>
+        )}
 
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardText} numberOfLines={2}>
+            {jogo.title}
+          </Text>
           {jogo.console ? (
-            <View style={[styles.badge, { backgroundColor: cor }]}>
-              <Text style={styles.badgeText}>{jogo.console}</Text>
+            <View style={styles.consoleRow}>
+              <View style={[styles.consoleDot, { backgroundColor: cor }]} />
+              <Text style={styles.consoleText}>{jogo.console}</Text>
             </View>
           ) : null}
-
-          <View style={styles.cardRodape}>
-            <Text style={styles.cardText} numberOfLines={2}>
-              {jogo.title}
-            </Text>
-            <Ionicons name="play-circle" size={22} color={cor} />
-          </View>
         </View>
       </Pressable>
     </Animated.View>
@@ -110,31 +180,27 @@ function CartaoJogo({ jogo, indice, onPress }) {
 }
 
 export default function HomeScreen({ navigation }) {
+  const [fontesProntas] = useFonts({
+    Rajdhani_500Medium,
+    Rajdhani_600SemiBold,
+    Rajdhani_700Bold,
+  });
+
   const [activeTab, setActiveTab] = useState('Recent');
   const [menuOpen, setMenuOpen] = useState(false);
   const [games, setGames] = useState(EXEMPLOS);
   const [erro, setErro] = useState('');
 
   const menuAnim = useRef(new Animated.Value(0)).current;
-  const tituloAnim = useRef(new Animated.Value(0)).current;
 
   const showCards = activeTab === 'Recent' || activeTab === 'Games';
   const lista = Array.isArray(games) ? games : [];
-
-  // Título entra com fade
-  useEffect(() => {
-    Animated.timing(tituloAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: NATIVO,
-    }).start();
-  }, []);
 
   // Menu abre e fecha com animação
   useEffect(() => {
     Animated.timing(menuAnim, {
       toValue: menuOpen ? 1 : 0,
-      duration: 220,
+      duration: 180,
       useNativeDriver: NATIVO,
     }).start();
   }, [menuOpen]);
@@ -203,16 +269,22 @@ export default function HomeScreen({ navigation }) {
     navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
   }
 
-  const menuDeslizar = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
+  const menuDeslizar = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
+
+  // espera a fonte carregar
+  if (!fontesProntas) {
+    return <View style={{ flex: 1, backgroundColor: '#0F0D1A' }} />;
+  }
 
   return (
-    <LinearGradient colors={['#1E1830', '#3A2F55', '#5B4A7A']} style={{ flex: 1 }}>
+    <LinearGradient colors={['#0F0D1A', '#171230']} style={{ flex: 1 }}>
+      <FundoLetras />
       <View style={styles.container}>
-        {/* Título */}
-        <Animated.View style={[styles.tituloBox, { opacity: tituloAnim }]}>
-          <Text style={styles.titulo}>ARCHV ROOMS</Text>
-          <Text style={styles.subtitulo}>your space — your game</Text>
-        </Animated.View>
+        {/* Logo + Título */}
+        <View style={styles.tituloBox}>
+          <Image source={require('../../assets/logo.png')} style={styles.logo} />
+          <Text style={styles.titulo}>Archv Rooms</Text>
+        </View>
 
         {/* Abas + botão do menu */}
         <View style={styles.header}>
@@ -222,6 +294,7 @@ export default function HomeScreen({ navigation }) {
                 key={tab}
                 style={[styles.tab, activeTab === tab && styles.tabActive]}
                 onPress={() => setActiveTab(tab)}
+                activeOpacity={0.7}
               >
                 <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
                   {tab}
@@ -231,7 +304,7 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           <TouchableOpacity onPress={() => setMenuOpen(!menuOpen)} style={styles.menuBotao}>
-            <Ionicons name="ellipsis-vertical" size={22} color="#fff" />
+            <Ionicons name="ellipsis-horizontal" size={22} color="#C9C3E8" />
           </TouchableOpacity>
         </View>
 
@@ -244,7 +317,6 @@ export default function HomeScreen({ navigation }) {
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* key com a aba faz os cartões animarem de novo ao trocar de aba */}
             {lista.map((jogo, i) => (
               <CartaoJogo
                 key={activeTab + String(jogo.id)}
@@ -256,7 +328,7 @@ export default function HomeScreen({ navigation }) {
           </ScrollView>
         ) : (
           <View style={styles.empty}>
-            <Ionicons name="save-outline" size={40} color="#B8B0C8" />
+            <Ionicons name="save-outline" size={36} color="#5E5784" />
             <Text style={styles.emptyText}>No saves yet</Text>
           </View>
         )}
@@ -280,16 +352,16 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.menuText}>Settings</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem}>
-              <Text style={styles.menuText}>www.archvrooms</Text>
+              <Text style={styles.menuText}>archvrooms</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem}>
-              <Text style={styles.menuText}>About archvrooms</Text>
+              <Text style={styles.menuText}>About</Text>
+            </TouchableOpacity>
+            <View style={styles.menuDivisor} />
+            <TouchableOpacity style={styles.menuItem} onPress={handleExit}>
+              <Text style={[styles.menuText, { color: '#FF6B6B' }]}>Exit</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity style={[styles.menu, styles.exitBox]} onPress={handleExit}>
-            <Text style={styles.menuText}>Exit</Text>
-          </TouchableOpacity>
         </Animated.View>
       </View>
     </LinearGradient>
@@ -301,23 +373,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 20,
+    paddingTop: 60,
+    paddingBottom: 12,
   },
   tituloBox: {
-    marginBottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 24,
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    resizeMode: 'contain',
   },
   titulo: {
+    fontFamily: TEXTO_BOLD,
     color: '#fff',
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: 3,
-  },
-  subtitulo: {
-    color: '#B8B0C8',
-    fontSize: 12,
-    letterSpacing: 1,
-    marginTop: 2,
+    fontSize: 28,
+    letterSpacing: 0.5,
   },
   header: {
     flexDirection: 'row',
@@ -326,123 +400,129 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(75, 65, 99, 0.6)',
-    borderRadius: 10,
-    padding: 3,
+    gap: 8,
   },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#1E1A38',
   },
   tabActive: {
-    backgroundColor: '#6A5E85',
+    backgroundColor: ACENTO,
   },
   tabText: {
-    color: '#B8B0C8',
-    fontSize: 14,
+    fontFamily: TEXTO_SEMI,
+    color: '#A9A2D0',
+    fontSize: 16,
   },
   tabTextActive: {
-    color: '#fff',
-    fontWeight: '600',
+    color: '#0F0D1A',
+    fontFamily: TEXTO_BOLD,
   },
   menuBotao: {
     padding: 6,
   },
   erro: {
-    color: '#FF9AA8',
-    fontSize: 13,
+    fontFamily: TEXTO,
+    color: '#FF6B6B',
+    fontSize: 15,
     marginTop: 12,
   },
   list: {
     flex: 1,
-    marginTop: 16,
+    marginTop: 20,
   },
   listContent: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingBottom: 20,
+    paddingBottom: 30,
   },
   cardWrap: {
     width: '48%',
-    marginBottom: 14,
+    marginBottom: 18,
   },
   card: {
-    backgroundColor: 'rgba(75, 65, 99, 0.7)',
+    backgroundColor: '#1E1A38',
     borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
   },
   cardImage: {
-    height: 80,
+    height: 110,
+    width: '100%',
+  },
+  cardSemImagem: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardInicial: {
-    fontSize: 38,
-    fontWeight: '800',
+    fontFamily: TEXTO_BOLD,
+    fontSize: 40,
   },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  cardRodape: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    gap: 6,
+  cardInfo: {
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    minHeight: 68,
   },
   cardText: {
-    flex: 1,
-    color: '#EDE8F7',
+    fontFamily: TEXTO_BOLD,
+    color: '#fff',
+    fontSize: 16,
+    lineHeight: 19,
+  },
+  consoleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  consoleDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  consoleText: {
+    fontFamily: TEXTO_SEMI,
+    color: '#8F88B8',
     fontSize: 13,
-    fontWeight: '600',
   },
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
   },
   emptyText: {
-    color: '#B8B0C8',
-    fontSize: 14,
+    fontFamily: TEXTO_SEMI,
+    color: '#6F688F',
+    fontSize: 17,
   },
   menuWrapper: {
     position: 'absolute',
-    top: 130,
+    top: 150,
     right: 20,
     width: 190,
   },
   menu: {
-    backgroundColor: 'rgba(75, 65, 99, 0.97)',
-    borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: '#221D42',
+    borderRadius: 14,
+    paddingVertical: 6,
   },
   menuItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
   menuText: {
+    fontFamily: TEXTO_SEMI,
     color: '#fff',
-    fontSize: 13,
+    fontSize: 17,
   },
-  exitBox: {
-    marginTop: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  menuDivisor: {
+    height: 1,
+    backgroundColor: '#352F5C',
+    marginVertical: 4,
+    marginHorizontal: 12,
   },
 });
