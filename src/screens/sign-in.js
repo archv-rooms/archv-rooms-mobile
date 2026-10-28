@@ -6,112 +6,92 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   ActivityIndicator,
   Animated,
-  Pressable,
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFonts } from 'expo-font';
+import {
+  Rajdhani_500Medium,
+  Rajdhani_600SemiBold,
+  Rajdhani_700Bold,
+} from '@expo-google-fonts/rajdhani';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { TOKEN_KEY } from '../services/api';
 import { MODO_TESTE } from '../services/mock';
 
-const NATIVO = Platform.OS !== 'web';
+const NATIVE = Platform.OS !== 'web';
 
-// Bloco que entra deslizando de baixo, com atraso
-function Entrada({ atraso = 0, children }) {
-  const anim = useRef(new Animated.Value(0)).current;
+const COLORS = {
+  gradient: ['#1E1830', '#3A2F55', '#5B4A7A'],
+  surface: '#4B4163',
+  button: '#6A5BD6',
+  accent: '#8E7CF0',
+  softText: '#B8B0C8',
+  error: '#FF9AA8',
+};
 
-  useEffect(() => {
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 500,
-      delay: atraso,
-      useNativeDriver: NATIVO,
-    }).start();
-  }, []);
-
-  const deslizar = anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
-
-  return (
-    <Animated.View style={{ opacity: anim, transform: [{ translateY: deslizar }] }}>
-      {children}
-    </Animated.View>
-  );
-}
-
-// Botão com "apertinho"
-function BotaoAnimado({ onPress, disabled, style, children }) {
-  const escala = useRef(new Animated.Value(1)).current;
-
-  return (
-    <Animated.View style={{ transform: [{ scale: escala }] }}>
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        onPressIn={() =>
-          Animated.spring(escala, { toValue: 0.95, useNativeDriver: NATIVO }).start()
-        }
-        onPressOut={() =>
-          Animated.spring(escala, { toValue: 1, friction: 4, useNativeDriver: NATIVO }).start()
-        }
-        style={style}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
-}
+const FONT = {
+  normal: 'Rajdhani_500Medium',
+  semi: 'Rajdhani_600SemiBold',
+  bold: 'Rajdhani_700Bold',
+};
 
 export default function SignInScreen({ navigation }) {
+  const [fontsReady] = useFonts({
+    Rajdhani_500Medium,
+    Rajdhani_600SemiBold,
+    Rajdhani_700Bold,
+  });
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [foco, setFoco] = useState('');
+  const [focus, setFocus] = useState('');
 
-  const tituloAnim = useRef(new Animated.Value(0)).current;
-  const tremer = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  const shake = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(tituloAnim, {
+    Animated.timing(fade, {
       toValue: 1,
-      duration: 700,
-      useNativeDriver: NATIVO,
+      duration: 600,
+      useNativeDriver: NATIVE,
     }).start();
   }, []);
 
-  // Balança o formulário quando dá erro
-  function balancar() {
+  function shakeForm() {
     Animated.sequence([
-      Animated.timing(tremer, { toValue: 8, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: -8, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: 6, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: -6, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: 0, duration: 60, useNativeDriver: NATIVO }),
+      Animated.timing(shake, { toValue: 8, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: -8, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: 6, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: -6, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: NATIVE }),
     ]).start();
   }
 
-  function mostrarErro(mensagem) {
-    setError(mensagem);
-    balancar();
+  function showError(message) {
+    setError(message);
+    shakeForm();
   }
 
   async function handleLogin() {
     if (loading) return;
 
     if (!email.trim() || !password) {
-      mostrarErro('Preencha o e-mail e a senha.');
+      showError('Preencha o e-mail e a senha.');
       return;
     }
 
     setError('');
     setLoading(true);
 
-    // Modo teste: aceita qualquer login, sem chamar a API
     if (MODO_TESTE) {
       await AsyncStorage.setItem(TOKEN_KEY, 'token-de-teste');
       setLoading(false);
@@ -120,7 +100,6 @@ export default function SignInScreen({ navigation }) {
     }
 
     try {
-      // timeout maior porque a API pode demorar ~1 minuto para "acordar"
       const response = await api.post(
         '/auth/login',
         { email: email.trim(), password },
@@ -130,23 +109,21 @@ export default function SignInScreen({ navigation }) {
       const token = response?.data?.data?.token;
 
       if (!token) {
-        mostrarErro('Resposta inesperada do servidor. Tente novamente.');
+        showError('Resposta inesperada do servidor. Tente novamente.');
         return;
       }
 
       await AsyncStorage.setItem(TOKEN_KEY, token);
-
-      // reset para o usuário não voltar ao login ao apertar "voltar"
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
 
       if (apiMessage) {
-        mostrarErro(apiMessage);
+        showError(apiMessage);
       } else if (err?.code === 'ECONNABORTED') {
-        mostrarErro('O servidor demorou para responder. Tente novamente.');
+        showError('O servidor demorou para responder. Tente novamente.');
       } else {
-        mostrarErro(
+        showError(
           'Não foi possível conectar ao servidor. Se for a primeira vez, aguarde um minuto e tente de novo.'
         );
       }
@@ -155,58 +132,65 @@ export default function SignInScreen({ navigation }) {
     }
   }
 
+  if (!fontsReady) {
+    return <View style={{ flex: 1, backgroundColor: '#1E1830' }} />;
+  }
+
   return (
-    <LinearGradient colors={['#1E1830', '#3A2F55', '#5B4A7A']} style={{ flex: 1 }}>
+    <LinearGradient colors={COLORS.gradient} style={{ flex: 1 }}>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Voltar */}
-        <TouchableOpacity
-          style={styles.back}
-          onPress={() => navigation.canGoBack() && navigation.goBack()}
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Ionicons name="arrow-back" size={26} color="#fff" />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.back}
+            onPress={() => navigation.canGoBack() && navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={22} color="#fff" />
+          </TouchableOpacity>
 
-        {/* Logo + Título */}
-        <Animated.View style={[styles.tituloBox, { opacity: tituloAnim }]}>
-          <Image
-            source={require('../../assets/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-          <Text style={styles.title}>Log In</Text>
-        </Animated.View>
-
-        <Animated.View style={{ transform: [{ translateX: tremer }] }}>
-          {/* Email */}
-          <Entrada atraso={150}>
-            <TextInput
-              style={[styles.input, foco === 'email' && styles.inputFoco]}
-              placeholder="Email"
-              placeholderTextColor="#B8B0C8"
-              value={email}
-              onChangeText={setEmail}
-              onFocus={() => setFoco('email')}
-              onBlur={() => setFoco('')}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!loading}
+          <Animated.View style={[styles.header, { opacity: fade }]}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
             />
-          </Entrada>
+            <Text style={styles.title}>Welcome back</Text>
+            <Text style={styles.subtitle}>Log in to continue playing</Text>
+          </Animated.View>
 
-          {/* Senha */}
-          <Entrada atraso={250}>
-            <View style={[styles.passwordBox, foco === 'senha' && styles.inputFoco]}>
+          <Animated.View style={{ opacity: fade, transform: [{ translateX: shake }] }}>
+            <View style={[styles.field, focus === 'email' && styles.fieldFocus]}>
+              <Ionicons name="mail-outline" size={20} color={COLORS.softText} />
               <TextInput
-                style={styles.passwordInput}
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={COLORS.softText}
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setFocus('email')}
+                onBlur={() => setFocus('')}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+            </View>
+
+            <View style={[styles.field, focus === 'password' && styles.fieldFocus]}>
+              <Ionicons name="lock-closed-outline" size={20} color={COLORS.softText} />
+              <TextInput
+                style={styles.input}
                 placeholder="Password"
-                placeholderTextColor="#B8B0C8"
+                placeholderTextColor={COLORS.softText}
                 value={password}
                 onChangeText={setPassword}
-                onFocus={() => setFoco('senha')}
-                onBlur={() => setFoco('')}
+                onFocus={() => setFocus('password')}
+                onBlur={() => setFocus('')}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 editable={!loading}
@@ -220,46 +204,50 @@ export default function SignInScreen({ navigation }) {
                 />
               </TouchableOpacity>
             </View>
-          </Entrada>
 
-          {/* Mensagem de erro */}
-          {error !== '' && <Text style={styles.error}>{error}</Text>}
+            <TouchableOpacity
+              style={styles.forgotBox}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
+              <Text style={styles.forgot}>Forgot password?</Text>
+            </TouchableOpacity>
 
-          {/* Botão entrar */}
-          <Entrada atraso={350}>
-            <BotaoAnimado
+            {error !== '' && <Text style={styles.error}>{error}</Text>}
+
+            <TouchableOpacity
+              style={[styles.loginButton, loading && { opacity: 0.7 }]}
               onPress={handleLogin}
               disabled={loading}
-              style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+              activeOpacity={0.85}
             >
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.loginText}>Log in</Text>
               )}
-            </BotaoAnimado>
-          </Entrada>
-        </Animated.View>
+            </TouchableOpacity>
+          </Animated.View>
 
-        <Entrada atraso={450}>
-          <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-            <Text style={styles.forgot}>Forgot Password</Text>
-          </TouchableOpacity>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-          <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-            <Text style={styles.createAccount}>Create account</Text>
-          </TouchableOpacity>
-        </Entrada>
-
-        <View style={{ flex: 1 }} />
-
-        {/* Google */}
-        <Entrada atraso={550}>
-          <TouchableOpacity style={styles.googleButton}>
+          <TouchableOpacity style={styles.googleButton} activeOpacity={0.8}>
             <Ionicons name="logo-google" size={18} color="#fff" />
             <Text style={styles.googleText}>Continue with Google</Text>
           </TouchableOpacity>
-        </Entrada>
+
+          <View style={{ flex: 1, minHeight: 24 }} />
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
+              <Text style={styles.footerLink}>Create account</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
@@ -267,104 +255,138 @@ export default function SignInScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: 'transparent',
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 50,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
   back: {
-    marginBottom: 20,
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tituloBox: {
-    marginBottom: 24,
+  header: {
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 32,
   },
   logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-    marginBottom: 12,
+    width: 84,
+    height: 84,
+    marginBottom: 14,
   },
   title: {
+    fontFamily: FONT.bold,
     color: '#fff',
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 34,
+    letterSpacing: 0.5,
   },
-  input: {
-    backgroundColor: '#4B4163',
-    borderRadius: 12,
+  subtitle: {
+    fontFamily: FONT.normal,
+    color: COLORS.softText,
+    fontSize: 18,
+    marginTop: 2,
+  },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
     paddingHorizontal: 16,
-    height: 52,
-    color: '#fff',
+    height: 56,
     marginBottom: 14,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  inputFoco: {
-    borderColor: '#8E7CF0',
+  fieldFocus: {
+    borderColor: COLORS.accent,
   },
-  passwordBox: {
-    backgroundColor: '#4B4163',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  passwordInput: {
+  input: {
     flex: 1,
-    color: '#fff',
     height: '100%',
+    color: '#fff',
+    fontFamily: FONT.semi,
+    fontSize: 18,
+  },
+  forgotBox: {
+    alignSelf: 'flex-end',
+    paddingVertical: 4,
+    marginBottom: 18,
+  },
+  forgot: {
+    fontFamily: FONT.semi,
+    color: COLORS.softText,
+    fontSize: 16,
   },
   error: {
-    color: '#FF9AA8',
-    fontSize: 13,
+    fontFamily: FONT.semi,
+    color: COLORS.error,
+    fontSize: 16,
     textAlign: 'center',
     marginBottom: 14,
   },
   loginButton: {
-    backgroundColor: '#6A5BD6',
-    borderRadius: 26,
-    height: 52,
+    backgroundColor: COLORS.button,
+    borderRadius: 28,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loginButtonDisabled: {
-    opacity: 0.7,
-  },
   loginText: {
+    fontFamily: FONT.bold,
     color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 20,
+    letterSpacing: 0.5,
   },
-  forgot: {
-    color: '#B8B0C8',
-    textAlign: 'center',
-    marginTop: 18,
-    fontSize: 13,
-  },
-  createAccount: {
-    color: '#B8B0C8',
-    textAlign: 'center',
-    marginTop: 14,
-    fontSize: 13,
-  },
-  googleButton: {
-    alignSelf: 'center',
+  divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#5A4E75',
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    gap: 12,
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  dividerText: {
+    fontFamily: FONT.semi,
+    color: COLORS.softText,
+    fontSize: 16,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   googleText: {
+    fontFamily: FONT.semi,
     color: '#fff',
-    fontSize: 13,
+    fontSize: 18,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  footerText: {
+    fontFamily: FONT.normal,
+    color: COLORS.softText,
+    fontSize: 17,
+  },
+  footerLink: {
+    fontFamily: FONT.bold,
+    color: '#fff',
+    fontSize: 17,
   },
 });

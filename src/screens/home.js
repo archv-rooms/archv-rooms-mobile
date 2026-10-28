@@ -24,7 +24,13 @@ const NATIVO = Platform.OS !== 'web';
 const TEXTO = 'Rajdhani_500Medium';
 const TEXTO_SEMI = 'Rajdhani_600SemiBold';
 const TEXTO_BOLD = 'Rajdhani_700Bold';
-const ACENTO = '#9B8CFF';
+
+// Mesmas cores das telas de login e cadastro
+const ACENTO = '#8E7CF0';
+const ROXO_BOTAO = '#6A5BD6';
+const FUNDO_ESCURO = '#1E1830';
+const SUPERFICIE = '#4B4163';
+const TEXTO_SUAVE = '#B8B0C8';
 
 // Cartões de exemplo, usados só se a API não responder
 const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
@@ -107,7 +113,7 @@ function LetraFlutuante({ config }) {
         left: config.left,
         fontFamily: TEXTO_BOLD,
         fontSize: config.tam,
-        color: ACENTO,
+        color: '#B8A9FF',
         opacity: config.op,
         transform: [{ translateY: subir }, { rotate: config.rot }],
       }}
@@ -273,11 +279,11 @@ export default function HomeScreen({ navigation }) {
 
   // espera a fonte carregar
   if (!fontesProntas) {
-    return <View style={{ flex: 1, backgroundColor: '#0F0D1A' }} />;
+    return <View style={{ flex: 1, backgroundColor: FUNDO_ESCURO }} />;
   }
 
   return (
-    <LinearGradient colors={['#0F0D1A', '#171230']} style={{ flex: 1 }}>
+    <LinearGradient colors={['#1E1830', '#3A2F55', '#5B4A7A']} style={{ flex: 1 }}>
       <FundoLetras />
       <View style={styles.container}>
         {/* Logo + Título */}
@@ -304,7 +310,7 @@ export default function HomeScreen({ navigation }) {
           </View>
 
           <TouchableOpacity onPress={() => setMenuOpen(!menuOpen)} style={styles.menuBotao}>
-            <Ionicons name="ellipsis-horizontal" size={22} color="#C9C3E8" />
+            <Ionicons name="ellipsis-horizontal" size={22} color="#E6E0F0" />
           </TouchableOpacity>
         </View>
 
@@ -328,7 +334,7 @@ export default function HomeScreen({ navigation }) {
           </ScrollView>
         ) : (
           <View style={styles.empty}>
-            <Ionicons name="save-outline" size={36} color="#5E5784" />
+            <Ionicons name="save-outline" size={36} color={TEXTO_SUAVE} />
             <Text style={styles.emptyText}>No saves yet</Text>
           </View>
         )}
@@ -359,7 +365,7 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
             <View style={styles.menuDivisor} />
             <TouchableOpacity style={styles.menuItem} onPress={handleExit}>
-              <Text style={[styles.menuText, { color: '#FF6B6B' }]}>Exit</Text>
+              <Text style={[styles.menuText, { color: '#FF9AA8' }]}>Exit</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -406,18 +412,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#1E1A38',
+    backgroundColor: SUPERFICIE,
   },
   tabActive: {
-    backgroundColor: ACENTO,
+    backgroundColor: ROXO_BOTAO,
   },
   tabText: {
     fontFamily: TEXTO_SEMI,
-    color: '#A9A2D0',
+    color: TEXTO_SUAVE,
     fontSize: 16,
   },
   tabTextActive: {
-    color: '#0F0D1A',
+    color: '#fff',
     fontFamily: TEXTO_BOLD,
   },
   menuBotao: {
@@ -425,7 +431,7 @@ const styles = StyleSheet.create({
   },
   erro: {
     fontFamily: TEXTO,
-    color: '#FF6B6B',
+    color: '#FF9AA8',
     fontSize: 15,
     marginTop: 12,
   },
@@ -444,7 +450,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   card: {
-    backgroundColor: '#1E1A38',
+    backgroundColor: SUPERFICIE,
     borderRadius: 14,
     overflow: 'hidden',
   },
@@ -485,7 +491,7 @@ const styles = StyleSheet.create({
   },
   consoleText: {
     fontFamily: TEXTO_SEMI,
-    color: '#8F88B8',
+    color: TEXTO_SUAVE,
     fontSize: 13,
   },
   empty: {
@@ -496,7 +502,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontFamily: TEXTO_SEMI,
-    color: '#6F688F',
+    color: TEXTO_SUAVE,
     fontSize: 17,
   },
   menuWrapper: {
@@ -506,7 +512,7 @@ const styles = StyleSheet.create({
     width: 190,
   },
   menu: {
-    backgroundColor: '#221D42',
+    backgroundColor: '#5A4E75',
     borderRadius: 14,
     paddingVertical: 6,
   },
@@ -521,7 +527,7 @@ const styles = StyleSheet.create({
   },
   menuDivisor: {
     height: 1,
-    backgroundColor: '#352F5C',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     marginVertical: 4,
     marginHorizontal: 12,
   },

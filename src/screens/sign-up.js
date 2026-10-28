@@ -11,81 +11,66 @@ import {
   ScrollView,
   ActivityIndicator,
   Animated,
-  Pressable,
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFonts } from 'expo-font';
+import {
+  Rajdhani_500Medium,
+  Rajdhani_600SemiBold,
+  Rajdhani_700Bold,
+} from '@expo-google-fonts/rajdhani';
 import api from '../services/api';
 import { MODO_TESTE } from '../services/mock';
 
-const NATIVO = Platform.OS !== 'web';
+const NATIVE = Platform.OS !== 'web';
 
-// Bloco que entra deslizando de baixo, com atraso
-function Entrada({ atraso = 0, children }) {
-  const anim = useRef(new Animated.Value(0)).current;
+const COLORS = {
+  gradient: ['#1E1830', '#3A2F55', '#5B4A7A'],
+  surface: '#4B4163',
+  button: '#6A5BD6',
+  accent: '#8E7CF0',
+  softText: '#B8B0C8',
+  error: '#FF9AA8',
+  success: '#9BE7B0',
+};
 
-  useEffect(() => {
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 500,
-      delay: atraso,
-      useNativeDriver: NATIVO,
-    }).start();
-  }, []);
+const FONT = {
+  normal: 'Rajdhani_500Medium',
+  semi: 'Rajdhani_600SemiBold',
+  bold: 'Rajdhani_700Bold',
+};
 
-  const deslizar = anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
-
+// Input row with an icon on the left (and an optional action on the right)
+function Field({ icon, focused, children }) {
   return (
-    <Animated.View style={{ opacity: anim, transform: [{ translateY: deslizar }] }}>
+    <View style={[styles.field, focused && styles.fieldFocus]}>
+      <Ionicons name={icon} size={20} color={COLORS.softText} />
       {children}
-    </Animated.View>
+    </View>
   );
 }
 
-// Botão com "apertinho"
-function BotaoAnimado({ onPress, disabled, style, children }) {
-  const escala = useRef(new Animated.Value(1)).current;
-
-  return (
-    <Animated.View style={{ transform: [{ scale: escala }] }}>
-      <Pressable
-        onPress={onPress}
-        disabled={disabled}
-        onPressIn={() =>
-          Animated.spring(escala, { toValue: 0.95, useNativeDriver: NATIVO }).start()
-        }
-        onPressOut={() =>
-          Animated.spring(escala, { toValue: 1, friction: 4, useNativeDriver: NATIVO }).start()
-        }
-        style={style}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
-}
-
-// Mensagem de sucesso que aparece com fade
-function Sucesso({ onIrLogin }) {
-  const anim = useRef(new Animated.Value(0)).current;
+function SuccessMessage({ onGoLogin }) {
+  const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(anim, {
+    Animated.timing(fade, {
       toValue: 1,
       duration: 400,
-      useNativeDriver: NATIVO,
+      useNativeDriver: NATIVE,
     }).start();
   }, []);
 
   return (
-    <Animated.View style={[styles.sucessoBox, { opacity: anim }]}>
-      <Ionicons name="checkmark-circle" size={22} color="#9BE7B0" />
+    <Animated.View style={[styles.successBox, { opacity: fade }]}>
+      <Ionicons name="checkmark-circle" size={22} color={COLORS.success} />
       <View style={{ flex: 1 }}>
-        <Text style={styles.success}>
+        <Text style={styles.successText}>
           Conta criada! Verifique seu e-mail para ativar a conta antes de entrar.
         </Text>
-        <TouchableOpacity onPress={onIrLogin}>
+        <TouchableOpacity onPress={onGoLogin}>
           <Text style={styles.goLogin}>Go to Log In</Text>
         </TouchableOpacity>
       </View>
@@ -94,6 +79,12 @@ function Sucesso({ onIrLogin }) {
 }
 
 export default function SignUpScreen({ navigation }) {
+  const [fontsReady] = useFonts({
+    Rajdhani_500Medium,
+    Rajdhani_600SemiBold,
+    Rajdhani_700Bold,
+  });
+
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -103,47 +94,46 @@ export default function SignUpScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [foco, setFoco] = useState('');
+  const [focus, setFocus] = useState('');
 
-  const tituloAnim = useRef(new Animated.Value(0)).current;
-  const tremer = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  const shake = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(tituloAnim, {
+    Animated.timing(fade, {
       toValue: 1,
-      duration: 700,
-      useNativeDriver: NATIVO,
+      duration: 600,
+      useNativeDriver: NATIVE,
     }).start();
   }, []);
 
-  // Balança o formulário quando dá erro
-  function balancar() {
+  function shakeForm() {
     Animated.sequence([
-      Animated.timing(tremer, { toValue: 8, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: -8, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: 6, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: -6, duration: 60, useNativeDriver: NATIVO }),
-      Animated.timing(tremer, { toValue: 0, duration: 60, useNativeDriver: NATIVO }),
+      Animated.timing(shake, { toValue: 8, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: -8, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: 6, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: -6, duration: 60, useNativeDriver: NATIVE }),
+      Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: NATIVE }),
     ]).start();
   }
 
-  function mostrarErro(mensagem) {
-    setError(mensagem);
-    balancar();
+  function showError(message) {
+    setError(message);
+    shakeForm();
   }
 
-  const showBirthInfo = () => {
+  function showBirthInfo() {
     Alert.alert(
       'Date of Birth',
       'We use your date of birth to confirm you are old enough to use archv-rooms.'
     );
-  };
+  }
 
   async function handleSignUp() {
     if (loading) return;
 
     if (!name.trim() || !username.trim() || !email.trim() || !password) {
-      mostrarErro('Preencha nome, username, e-mail e senha.');
+      showError('Preencha nome, username, e-mail e senha.');
       return;
     }
 
@@ -151,7 +141,7 @@ export default function SignUpScreen({ navigation }) {
     setSuccess(false);
     setLoading(true);
 
-    // Modo teste: finge que criou a conta, sem chamar a API
+    // Test mode: pretends the account was created, without calling the API
     if (MODO_TESTE) {
       await new Promise((resolve) => setTimeout(resolve, 600));
       setLoading(false);
@@ -160,7 +150,6 @@ export default function SignUpScreen({ navigation }) {
     }
 
     try {
-      // timeout maior porque a API pode demorar para "acordar"
       await api.post(
         '/auth/register',
         {
@@ -176,172 +165,172 @@ export default function SignUpScreen({ navigation }) {
       const apiMessage = err?.response?.data?.message;
 
       if (apiMessage) {
-        mostrarErro(apiMessage);
+        showError(apiMessage);
       } else if (err?.code === 'ECONNABORTED') {
-        mostrarErro('O servidor demorou para responder. Tente novamente.');
+        showError('O servidor demorou para responder. Tente novamente.');
       } else {
-        mostrarErro('Não foi possível conectar ao servidor. Tente novamente.');
+        showError('Não foi possível conectar ao servidor. Tente novamente.');
       }
     } finally {
       setLoading(false);
     }
   }
 
+  if (!fontsReady) {
+    return <View style={{ flex: 1, backgroundColor: '#1E1830' }} />;
+  }
+
   return (
-    <LinearGradient colors={['#1E1830', '#3A2F55', '#5B4A7A']} style={{ flex: 1 }}>
+    <LinearGradient colors={COLORS.gradient} style={{ flex: 1 }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={{ flex: 1 }}
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Voltar */}
           <TouchableOpacity
             style={styles.back}
             onPress={() => navigation.canGoBack() && navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={26} color="#fff" />
+            <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
 
-          {/* Logo + Título */}
-          <Animated.View style={[styles.tituloBox, { opacity: tituloAnim }]}>
+          <Animated.View style={[styles.header, { opacity: fade }]}>
             <Image
               source={require('../../assets/logo.png')}
               style={styles.logo}
               resizeMode="contain"
             />
-            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.subtitle}>Join Archv Rooms and start playing</Text>
           </Animated.View>
 
-          <Animated.View style={{ transform: [{ translateX: tremer }] }}>
-            {/* Nome */}
-            <Entrada atraso={100}>
+          <Animated.View style={{ opacity: fade, transform: [{ translateX: shake }] }}>
+            <Field icon="person-outline" focused={focus === 'name'}>
               <TextInput
-                style={[styles.input, foco === 'nome' && styles.inputFoco]}
+                style={styles.input}
                 placeholder="Name"
-                placeholderTextColor="#B8B0C8"
+                placeholderTextColor={COLORS.softText}
                 value={name}
                 onChangeText={setName}
-                onFocus={() => setFoco('nome')}
-                onBlur={() => setFoco('')}
+                onFocus={() => setFocus('name')}
+                onBlur={() => setFocus('')}
                 editable={!loading}
               />
-            </Entrada>
+            </Field>
 
-            {/* Username */}
-            <Entrada atraso={180}>
+            <Field icon="at-outline" focused={focus === 'username'}>
               <TextInput
-                style={[styles.input, foco === 'username' && styles.inputFoco]}
+                style={styles.input}
                 placeholder="Username"
-                placeholderTextColor="#B8B0C8"
+                placeholderTextColor={COLORS.softText}
                 value={username}
                 onChangeText={setUsername}
-                onFocus={() => setFoco('username')}
-                onBlur={() => setFoco('')}
+                onFocus={() => setFocus('username')}
+                onBlur={() => setFocus('')}
                 autoCapitalize="none"
                 editable={!loading}
               />
-            </Entrada>
+            </Field>
 
-            {/* Data de nascimento (não é enviada para a API) */}
-            <Entrada atraso={260}>
-              <View style={[styles.fieldBox, foco === 'nascimento' && styles.inputFoco]}>
-                <TextInput
-                  style={styles.fieldInput}
-                  placeholder="Date of Birth"
-                  placeholderTextColor="#B8B0C8"
-                  value={birthDate}
-                  onChangeText={setBirthDate}
-                  onFocus={() => setFoco('nascimento')}
-                  onBlur={() => setFoco('')}
-                  keyboardType="numbers-and-punctuation"
-                  editable={!loading}
-                />
-                <TouchableOpacity onPress={showBirthInfo}>
-                  <Ionicons name="information-circle-outline" size={22} color="#E6E0F0" />
-                </TouchableOpacity>
-              </View>
-            </Entrada>
-
-            {/* Email */}
-            <Entrada atraso={340}>
+            {/* Date of birth is not sent to the API */}
+            <Field icon="calendar-outline" focused={focus === 'birth'}>
               <TextInput
-                style={[styles.input, foco === 'email' && styles.inputFoco]}
+                style={styles.input}
+                placeholder="Date of Birth"
+                placeholderTextColor={COLORS.softText}
+                value={birthDate}
+                onChangeText={setBirthDate}
+                onFocus={() => setFocus('birth')}
+                onBlur={() => setFocus('')}
+                keyboardType="numbers-and-punctuation"
+                editable={!loading}
+              />
+              <TouchableOpacity onPress={showBirthInfo}>
+                <Ionicons name="information-circle-outline" size={22} color="#E6E0F0" />
+              </TouchableOpacity>
+            </Field>
+
+            <Field icon="mail-outline" focused={focus === 'email'}>
+              <TextInput
+                style={styles.input}
                 placeholder="Email"
-                placeholderTextColor="#B8B0C8"
+                placeholderTextColor={COLORS.softText}
                 value={email}
                 onChangeText={setEmail}
-                onFocus={() => setFoco('email')}
-                onBlur={() => setFoco('')}
+                onFocus={() => setFocus('email')}
+                onBlur={() => setFocus('')}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!loading}
               />
-            </Entrada>
+            </Field>
 
-            {/* Senha */}
-            <Entrada atraso={420}>
-              <View style={[styles.fieldBox, foco === 'senha' && styles.inputFoco]}>
-                <TextInput
-                  style={styles.fieldInput}
-                  placeholder="Password"
-                  placeholderTextColor="#B8B0C8"
-                  value={password}
-                  onChangeText={setPassword}
-                  onFocus={() => setFoco('senha')}
-                  onBlur={() => setFoco('')}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  editable={!loading}
-                  onSubmitEditing={handleSignUp}
+            <Field icon="lock-closed-outline" focused={focus === 'password'}>
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor={COLORS.softText}
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setFocus('password')}
+                onBlur={() => setFocus('')}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                editable={!loading}
+                onSubmitEditing={handleSignUp}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={22}
+                  color="#E6E0F0"
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Ionicons
-                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                    size={22}
-                    color="#E6E0F0"
-                  />
-                </TouchableOpacity>
-              </View>
-            </Entrada>
+              </TouchableOpacity>
+            </Field>
 
-            {/* Mensagens */}
             {error !== '' && <Text style={styles.error}>{error}</Text>}
 
-            {success && <Sucesso onIrLogin={() => navigation.navigate('SignIn')} />}
+            {success && <SuccessMessage onGoLogin={() => navigation.navigate('SignIn')} />}
 
-            {/* Botão cadastrar */}
-            <Entrada atraso={500}>
-              <BotaoAnimado
-                onPress={handleSignUp}
-                disabled={loading}
-                style={[styles.signUpButton, loading && styles.buttonDisabled]}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.signUpText}>Sign up</Text>
-                )}
-              </BotaoAnimado>
-            </Entrada>
+            <TouchableOpacity
+              style={[styles.signUpButton, loading && { opacity: 0.7 }]}
+              onPress={handleSignUp}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.signUpText}>Sign up</Text>
+              )}
+            </TouchableOpacity>
           </Animated.View>
 
-          {/* Termos */}
-          <Entrada atraso={580}>
-            <Text style={styles.terms}>
-              By continuing, you agree to our Terms and Privacy Policy.
-            </Text>
+          <Text style={styles.terms}>
+            By continuing, you agree to our Terms and Privacy Policy.
+          </Text>
 
-            {/* Google */}
-            <TouchableOpacity style={styles.googleButton}>
-              <Ionicons name="logo-google" size={18} color="#fff" />
-              <Text style={styles.googleText}>Continue with Google</Text>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity style={styles.googleButton} activeOpacity={0.8}>
+            <Ionicons name="logo-google" size={18} color="#fff" />
+            <Text style={styles.googleText}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account?</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
+              <Text style={styles.footerLink}>Log in</Text>
             </TouchableOpacity>
-          </Entrada>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -351,117 +340,157 @@ export default function SignUpScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: 'transparent',
     paddingHorizontal: 24,
     paddingTop: 50,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
   back: {
-    marginBottom: 20,
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  tituloBox: {
+  header: {
+    alignItems: 'center',
+    marginTop: 4,
     marginBottom: 24,
   },
   logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 14,
-    marginBottom: 12,
+    width: 72,
+    height: 72,
+    marginBottom: 10,
   },
   title: {
+    fontFamily: FONT.bold,
     color: '#fff',
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 32,
+    letterSpacing: 0.5,
   },
-  input: {
-    backgroundColor: '#4B4163',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 52,
-    color: '#fff',
-    marginBottom: 14,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+  subtitle: {
+    fontFamily: FONT.normal,
+    color: COLORS.softText,
+    fontSize: 18,
+    marginTop: 2,
   },
-  inputFoco: {
-    borderColor: '#8E7CF0',
-  },
-  fieldBox: {
-    backgroundColor: '#4B4163',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 52,
+  field: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    gap: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: 54,
+    marginBottom: 12,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  fieldInput: {
+  fieldFocus: {
+    borderColor: COLORS.accent,
+  },
+  input: {
     flex: 1,
-    color: '#fff',
     height: '100%',
+    color: '#fff',
+    fontFamily: FONT.semi,
+    fontSize: 18,
   },
   error: {
-    color: '#FF9AA8',
-    fontSize: 13,
+    fontFamily: FONT.semi,
+    color: COLORS.error,
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 14,
+    marginVertical: 8,
   },
-  sucessoBox: {
+  successBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
     backgroundColor: 'rgba(155, 231, 176, 0.12)',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
-    marginBottom: 14,
+    marginVertical: 8,
   },
-  success: {
-    color: '#9BE7B0',
-    fontSize: 13,
+  successText: {
+    fontFamily: FONT.semi,
+    color: COLORS.success,
+    fontSize: 16,
     marginBottom: 6,
   },
   goLogin: {
+    fontFamily: FONT.bold,
     color: '#fff',
-    fontSize: 13,
+    fontSize: 16,
     textDecorationLine: 'underline',
   },
   signUpButton: {
-    backgroundColor: '#6A5BD6',
-    borderRadius: 26,
-    height: 52,
+    backgroundColor: COLORS.button,
+    borderRadius: 28,
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.7,
+    marginTop: 8,
   },
   signUpText: {
+    fontFamily: FONT.bold,
     color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 20,
+    letterSpacing: 0.5,
   },
   terms: {
-    color: '#B8B0C8',
+    fontFamily: FONT.normal,
+    color: COLORS.softText,
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: 14,
     marginTop: 14,
-    marginBottom: 16,
   },
-  googleButton: {
-    alignSelf: 'center',
+  divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#5A4E75',
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    gap: 12,
+    marginVertical: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  dividerText: {
+    fontFamily: FONT.semi,
+    color: COLORS.softText,
+    fontSize: 16,
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   googleText: {
+    fontFamily: FONT.semi,
     color: '#fff',
-    fontSize: 13,
+    fontSize: 18,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 24,
+  },
+  footerText: {
+    fontFamily: FONT.normal,
+    color: COLORS.softText,
+    fontSize: 17,
+  },
+  footerLink: {
+    fontFamily: FONT.bold,
+    color: '#fff',
+    fontSize: 17,
   },
 });
