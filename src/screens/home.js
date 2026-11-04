@@ -399,6 +399,10 @@ export default function HomeScreen({ navigation }) {
               />
             </View>
 
+            <Text style={styles.contador}>
+              {filtrados.length} {filtrados.length === 1 ? 'game' : 'games'}
+            </Text>
+
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -558,6 +562,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontFamily: TEXTO_SEMI,
     fontSize: 17,
+  },
+  contador: {
+    fontFamily: TEXTO_SEMI,
+    color: TEXTO_SUAVE,
+    fontSize: 14,
+    marginTop: 10,
   },
   filtros: {
     flexGrow: 0,
