@@ -8,6 +8,8 @@ import SignUpScreen from './src/screens/sign-up';
 import ForgotPasswordScreen from './src/screens/forgot-password';
 import HomeScreen from './src/screens/home';
 import GameScreen from './src/screens/game';
+import FriendsScreen from './src/screens/friends';
+import ChatScreen from './src/screens/chat';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,6 +34,8 @@ export default function App() {
         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Game" component={GameScreen} />
+        <Stack.Screen name="Friends" component={FriendsScreen} />
+        <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="Onboarding" component={PlaceholderScreen} />
       </Stack.Navigator>
     </NavigationContainer>

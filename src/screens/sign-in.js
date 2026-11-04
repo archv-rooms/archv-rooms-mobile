@@ -10,6 +10,7 @@ import {
   Platform,
   Animated,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,6 +20,8 @@ import {
   Rajdhani_600SemiBold,
   Rajdhani_700Bold,
 } from '@expo-google-fonts/rajdhani';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api, { TOKEN_KEY } from '../services/api';
 
 const NATIVE = Platform.OS !== 'web';
 
@@ -58,8 +61,23 @@ export default function SignInScreen({ navigation }) {
     }).start();
   }, []);
 
-  function handleLogin() {
+  function entrar() {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  }
+
+  async function handleLogin() {
+    if (!email.trim() || !password) {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+      entrar();
+      return;
+    }
+    try {
+      const res = await api.post('/auth/login', { email: email.trim(), password });
+      await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
+      entrar();
+    } catch (e) {
+      Alert.alert('Erro', 'E-mail ou senha incorretos.');
+    }
   }
 
   if (!fontsReady) {

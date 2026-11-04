@@ -11,6 +11,7 @@ import {
   Pressable,
   Image,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -198,6 +199,20 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
   );
 }
 
+// Botão da barra de baixo
+function ItemBarra({ icone, iconeAtivo, texto, ativo, onPress }) {
+  return (
+    <TouchableOpacity style={styles.barraItem} onPress={onPress} activeOpacity={0.7}>
+      <Ionicons
+        name={ativo ? iconeAtivo : icone}
+        size={24}
+        color={ativo ? '#fff' : TEXTO_SUAVE}
+      />
+      <Text style={[styles.barraTexto, ativo && styles.barraTextoAtivo]}>{texto}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function HomeScreen({ navigation }) {
   const [fontesProntas] = useFonts({
     Rajdhani_500Medium,
@@ -213,6 +228,7 @@ export default function HomeScreen({ navigation }) {
   const [filtro, setFiltro] = useState('All');
   const [favoritos, setFavoritos] = useState([]);
   const [recentes, setRecentes] = useState([]);
+  const [atualizando, setAtualizando] = useState(false);
 
   const menuAnim = useRef(new Animated.Value(0)).current;
 
@@ -240,7 +256,7 @@ export default function HomeScreen({ navigation }) {
     textoVazio = activeTab === 'Recent' && recentes.length === 0 ? 'No recent games' : 'No games found';
   }
 
-  // Menu abre e fecha com animação
+  // Painel da conta abre e fecha com animação
   useEffect(() => {
     Animated.timing(menuAnim, {
       toValue: menuOpen ? 1 : 0,
@@ -264,35 +280,42 @@ export default function HomeScreen({ navigation }) {
     carregarSalvos();
   }, []);
 
-  useEffect(() => {
-    async function carregarJogos() {
-      if (MODO_TESTE) {
-        setGames(JOGOS_TESTE);
-        return;
-      }
-      try {
-        const res = await api.get('/games');
-        const corpo = res.data;
-        let resultado = [];
-        if (Array.isArray(corpo)) {
-          resultado = corpo;
-        } else if (corpo && Array.isArray(corpo.data)) {
-          resultado = corpo.data;
-        } else if (corpo && corpo.data && Array.isArray(corpo.data.games)) {
-          resultado = corpo.data.games;
-        }
-        if (resultado.length > 0) {
-          setGames(resultado);
-        }
-        setErro('');
-      } catch (e) {
-        const msg =
-          e && e.response && e.response.data && e.response.data.message
-            ? e.response.data.message
-            : 'Não foi possível carregar os jogos.';
-        setErro(msg);
-      }
+  async function carregarJogos() {
+    if (MODO_TESTE) {
+      setGames(JOGOS_TESTE);
+      return;
     }
+    try {
+      const res = await api.get('/games');
+      const corpo = res.data;
+      let resultado = [];
+      if (Array.isArray(corpo)) {
+        resultado = corpo;
+      } else if (corpo && Array.isArray(corpo.data)) {
+        resultado = corpo.data;
+      } else if (corpo && corpo.data && Array.isArray(corpo.data.games)) {
+        resultado = corpo.data.games;
+      }
+      if (resultado.length > 0) {
+        setGames(resultado);
+      }
+      setErro('');
+    } catch (e) {
+      const msg =
+        e && e.response && e.response.data && e.response.data.message
+          ? e.response.data.message
+          : 'Não foi possível carregar os jogos.';
+      setErro(msg);
+    }
+  }
+
+  async function atualizar() {
+    setAtualizando(true);
+    await carregarJogos();
+    setAtualizando(false);
+  }
+
+  useEffect(() => {
     carregarJogos();
   }, []);
 
@@ -349,7 +372,17 @@ export default function HomeScreen({ navigation }) {
     navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
   }
 
-  const menuDeslizar = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
+  function irParaGames() {
+    setMenuOpen(false);
+    setActiveTab('Games');
+  }
+
+  function irParaAmigos() {
+    setMenuOpen(false);
+    navigation.navigate('Friends');
+  }
+
+  const menuDeslizar = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
 
   // espera a fonte carregar
   if (!fontesProntas) {
@@ -366,7 +399,7 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.titulo}>Archv Rooms</Text>
         </View>
 
-        {/* Abas + botão do menu */}
+        {/* Abas */}
         <View style={styles.header}>
           <View style={styles.tabs}>
             {TABS.map((tab) => (
@@ -382,10 +415,6 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
             ))}
           </View>
-
-          <TouchableOpacity onPress={() => setMenuOpen(!menuOpen)} style={styles.menuBotao}>
-            <Ionicons name="ellipsis-horizontal" size={22} color="#E6E0F0" />
-          </TouchableOpacity>
         </View>
 
         {erro !== '' && <Text style={styles.erro}>{erro}</Text>}
@@ -442,6 +471,14 @@ export default function HomeScreen({ navigation }) {
             style={styles.list}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={atualizando}
+                onRefresh={atualizar}
+                tintColor="#fff"
+                colors={[ACENTO]}
+              />
+            }
           >
             {filtrados.map((jogo, i) => (
               <CartaoJogo
@@ -460,41 +497,72 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.emptyText}>{textoVazio}</Text>
           </View>
         )}
-
-        {/* Menu */}
-        <Animated.View
-          style={[
-            styles.menuWrapper,
-            {
-              opacity: menuAnim,
-              transform: [{ translateY: menuDeslizar }],
-              pointerEvents: menuOpen ? 'auto' : 'none',
-            },
-          ]}
-        >
-          <View style={styles.menu}>
-            <TouchableOpacity style={styles.menuItem}>
-              <Text style={styles.menuText}>Load Rooms</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <Text style={styles.menuText}>Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <Text style={styles.menuText}>archvrooms</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem}>
-              <Text style={styles.menuText}>About</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={limparRecentes}>
-              <Text style={styles.menuText}>Clear recent</Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivisor} />
-            <TouchableOpacity style={styles.menuItem} onPress={handleExit}>
-              <Text style={[styles.menuText, { color: '#FF9AA8' }]}>Exit</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
       </View>
+
+      {/* Barra de baixo */}
+      <View style={styles.barra}>
+        <ItemBarra
+          icone="game-controller-outline"
+          iconeAtivo="game-controller"
+          texto="Games"
+          ativo={!menuOpen}
+          onPress={irParaGames}
+        />
+        <ItemBarra
+          icone="people-outline"
+          iconeAtivo="people"
+          texto="Friends"
+          ativo={false}
+          onPress={irParaAmigos}
+        />
+        <ItemBarra
+          icone="albums-outline"
+          iconeAtivo="albums"
+          texto="Rooms"
+          ativo={false}
+          onPress={() => setMenuOpen(false)}
+        />
+        <ItemBarra
+          icone="person-circle-outline"
+          iconeAtivo="person-circle"
+          texto="Account"
+          ativo={menuOpen}
+          onPress={() => setMenuOpen(!menuOpen)}
+        />
+      </View>
+
+      {/* Fecha o painel ao tocar fora */}
+      {menuOpen && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
+      )}
+
+      {/* Painel da conta */}
+      <Animated.View
+        pointerEvents={menuOpen ? 'auto' : 'none'}
+        style={[
+          styles.menuWrapper,
+          { opacity: menuAnim, transform: [{ translateY: menuDeslizar }] },
+        ]}
+      >
+        <View style={styles.menu}>
+          <TouchableOpacity style={styles.menuItem}>
+            <Text style={styles.menuText}>Settings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem}>
+            <Text style={styles.menuText}>archvrooms</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem}>
+            <Text style={styles.menuText}>About</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuItem} onPress={limparRecentes}>
+            <Text style={styles.menuText}>Clear recent</Text>
+          </TouchableOpacity>
+          <View style={styles.menuDivisor} />
+          <TouchableOpacity style={styles.menuItem} onPress={handleExit}>
+            <Text style={[styles.menuText, { color: '#FF9AA8' }]}>Exit</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
     </LinearGradient>
   );
 }
@@ -505,7 +573,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 12,
+    paddingBottom: 4,
   },
   tituloBox: {
     flexDirection: 'row',
@@ -550,9 +618,6 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: '#fff',
     fontFamily: TEXTO_BOLD,
-  },
-  menuBotao: {
-    padding: 6,
   },
   erro: {
     fontFamily: TEXTO,
@@ -615,7 +680,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingBottom: 30,
+    paddingBottom: 20,
   },
   cardWrap: {
     width: '48%',
@@ -688,10 +753,39 @@ const styles = StyleSheet.create({
     color: TEXTO_SUAVE,
     fontSize: 17,
   },
+
+  // Barra de baixo
+  barra: {
+    flexDirection: 'row',
+    backgroundColor: '#2A2142',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.10)',
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+    paddingHorizontal: 8,
+  },
+  barraItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: 4,
+  },
+  barraTexto: {
+    fontFamily: TEXTO_SEMI,
+    color: TEXTO_SUAVE,
+    fontSize: 13,
+  },
+  barraTextoAtivo: {
+    color: '#fff',
+    fontFamily: TEXTO_BOLD,
+  },
+
+  // Painel da conta (aparece em cima do botão Account)
   menuWrapper: {
     position: 'absolute',
-    top: 150,
-    right: 20,
+    bottom: Platform.OS === 'ios' ? 100 : 88,
+    right: 16,
     width: 190,
   },
   menu: {
