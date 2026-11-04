@@ -44,6 +44,10 @@ const TEXTO_SUAVE = '#B4AACB';
 const ROSA = '#FF6B8A';
 const ERRO = '#FF9AA8';
 
+// Medidas da barra de baixo
+const PILULA_LARGURA = 56;
+const BARRA_PAD = 8;
+
 // Cartões de exemplo, usados só se a API não responder
 const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
   id: 'exemplo-' + n,
@@ -70,17 +74,157 @@ function corDoConsole(nome) {
   return COR_CONSOLE[(nome || '').toUpperCase()] || ACENTO;
 }
 
+// ─── Animações reutilizáveis ───
+
+// Valor que sobe e desce devagar (para flutuar)
+function useFlutuar(amplitude, duracao) {
+  const v = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(v, {
+          toValue: 1,
+          duration: duracao,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: NATIVO,
+        }),
+        Animated.timing(v, {
+          toValue: 0,
+          duration: duracao,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: NATIVO,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  return v.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
+}
+
+// Botão que afunda ao tocar e volta com mola
+function Toque({ onPress, wrapStyle, style, children, escala = 0.93 }) {
+  const s = useRef(new Animated.Value(1)).current;
+
+  function dentro() {
+    Animated.spring(s, {
+      toValue: escala,
+      useNativeDriver: NATIVO,
+      speed: 50,
+      bounciness: 0,
+    }).start();
+  }
+
+  function fora() {
+    Animated.spring(s, {
+      toValue: 1,
+      useNativeDriver: NATIVO,
+      speed: 18,
+      bounciness: 14,
+    }).start();
+  }
+
+  return (
+    <Pressable onPress={onPress} onPressIn={dentro} onPressOut={fora} style={wrapStyle}>
+      <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
+    </Pressable>
+  );
+}
+
+// Entra com fade e subida, com atraso opcional
+function Entrada({ atraso = 0, style, children }) {
+  const v = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(atraso),
+      Animated.spring(v, {
+        toValue: 1,
+        useNativeDriver: NATIVO,
+        tension: 70,
+        friction: 10,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+          transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+// Luzes roxas se movendo ao fundo
+function FundoOrbes() {
+  const a = useFlutuar(26, 5200);
+  const b = useFlutuar(32, 6800);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Animated.View style={[styles.orbe1, { transform: [{ translateY: a }, { translateX: b }] }]} />
+      <Animated.View style={[styles.orbe2, { transform: [{ translateY: b }, { translateX: a }] }]} />
+    </View>
+  );
+}
+
+// Coração com "pop" ao favoritar
+function CoracaoBotao({ favorito, onPress }) {
+  const s = useRef(new Animated.Value(1)).current;
+  const primeira = useRef(true);
+
+  useEffect(() => {
+    if (primeira.current) {
+      primeira.current = false;
+      return;
+    }
+    if (favorito) {
+      s.setValue(0.6);
+      Animated.spring(s, {
+        toValue: 1,
+        useNativeDriver: NATIVO,
+        speed: 14,
+        bounciness: 22,
+      }).start();
+    }
+  }, [favorito]);
+
+  return (
+    <Toque onPress={onPress} wrapStyle={styles.coracaoWrap} style={styles.coracao} escala={0.8}>
+      <Animated.View style={{ transform: [{ scale: s }] }}>
+        <Ionicons
+          name={favorito ? 'heart' : 'heart-outline'}
+          size={18}
+          color={favorito ? ROSA : BRANCO}
+        />
+      </Animated.View>
+    </Toque>
+  );
+}
+
 function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
   const entrada = useRef(new Animated.Value(0)).current;
   const [imagemFalhou, setImagemFalhou] = useState(false);
 
   useEffect(() => {
-    Animated.timing(entrada, {
-      toValue: 1,
-      duration: 350,
-      delay: indice * 50,
-      useNativeDriver: NATIVO,
-    }).start();
+    Animated.sequence([
+      Animated.delay(Math.min(indice, 8) * 70),
+      Animated.spring(entrada, {
+        toValue: 1,
+        useNativeDriver: NATIVO,
+        tension: 60,
+        friction: 9,
+      }),
+    ]).start();
   }, []);
 
   const cor = corDoConsole(jogo.console);
@@ -88,11 +232,19 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
   const temImagem = jogo.image && !imagemFalhou;
 
   return (
-    <Animated.View style={[styles.cardWrap, { opacity: entrada }]}>
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
-      >
+    <Animated.View
+      style={[
+        styles.cardWrap,
+        {
+          opacity: entrada.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+          transform: [
+            { translateY: entrada.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) },
+            { scale: entrada.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) },
+          ],
+        },
+      ]}
+    >
+      <Toque onPress={onPress} style={styles.card} escala={0.95}>
         <View style={styles.thumb}>
           {temImagem ? (
             <Image
@@ -107,13 +259,17 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
             </View>
           )}
 
-          <TouchableOpacity style={styles.coracao} onPress={onFavorito} activeOpacity={0.7}>
-            <Ionicons
-              name={favorito ? 'heart' : 'heart-outline'}
-              size={18}
-              color={favorito ? ROSA : BRANCO}
-            />
-          </TouchableOpacity>
+          <LinearGradient
+            colors={['transparent', 'rgba(20,17,31,0.75)']}
+            style={styles.thumbSombra}
+            pointerEvents="none"
+          />
+
+          <View style={styles.play} pointerEvents="none">
+            <Ionicons name="play" size={14} color={BRANCO} style={{ marginLeft: 2 }} />
+          </View>
+
+          <CoracaoBotao favorito={favorito} onPress={onFavorito} />
         </View>
 
         <View style={styles.cardInfo}>
@@ -122,24 +278,57 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
           </Text>
           {jogo.console ? <Text style={styles.cardConsole}>{jogo.console}</Text> : null}
         </View>
-      </Pressable>
+      </Toque>
     </Animated.View>
   );
 }
 
 // Botão da barra de baixo
 function ItemBarra({ icone, iconeAtivo, texto, ativo, onPress }) {
+  const s = useRef(new Animated.Value(1)).current;
+  const primeira = useRef(true);
+
+  useEffect(() => {
+    if (primeira.current) {
+      primeira.current = false;
+      return;
+    }
+    if (ativo) {
+      s.setValue(0.7);
+      Animated.spring(s, {
+        toValue: 1,
+        useNativeDriver: NATIVO,
+        speed: 14,
+        bounciness: 18,
+      }).start();
+    }
+  }, [ativo]);
+
   return (
-    <TouchableOpacity style={styles.barraItem} onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.barraIcone, ativo && styles.barraIconeAtivo]}>
+    <Toque onPress={onPress} wrapStyle={{ flex: 1 }} style={styles.barraItem} escala={0.88}>
+      <Animated.View style={[styles.barraIcone, { transform: [{ scale: s }] }]}>
         <Ionicons
           name={ativo ? iconeAtivo : icone}
           size={24}
           color={ativo ? BRANCO : TEXTO_SUAVE}
         />
-      </View>
+      </Animated.View>
       <Text style={[styles.barraTexto, ativo && styles.barraTextoAtivo]}>{texto}</Text>
-    </TouchableOpacity>
+    </Toque>
+  );
+}
+
+// Tela vazia com ícone flutuando
+function EstadoVazio({ icone, texto }) {
+  const flutua = useFlutuar(6, 1600);
+
+  return (
+    <Entrada style={styles.empty}>
+      <Animated.View style={[styles.emptyIcone, { transform: [{ translateY: flutua }] }]}>
+        <Ionicons name={icone} size={34} color={TEXTO_SUAVE} />
+      </Animated.View>
+      <Text style={styles.emptyText}>{texto}</Text>
+    </Entrada>
   );
 }
 
@@ -159,8 +348,15 @@ export default function HomeScreen({ navigation }) {
   const [favoritos, setFavoritos] = useState([]);
   const [recentes, setRecentes] = useState([]);
   const [atualizando, setAtualizando] = useState(false);
+  const [larguraTabs, setLarguraTabs] = useState(0);
+  const [larguraBarra, setLarguraBarra] = useState(0);
 
   const menuAnim = useRef(new Animated.Value(0)).current;
+  const abaAnim = useRef(new Animated.Value(0)).current;
+  const barraAnim = useRef(new Animated.Value(0)).current;
+  const barraEntrada = useRef(new Animated.Value(0)).current;
+  const foco = useRef(new Animated.Value(0)).current;
+  const logoFlutua = useFlutuar(3, 2200);
 
   const showCards = activeTab === 'Recent' || activeTab === 'Games';
   const lista = Array.isArray(games) ? games : [];
@@ -187,14 +383,49 @@ export default function HomeScreen({ navigation }) {
       activeTab === 'Recent' && recentes.length === 0 ? 'Nenhum jogo recente' : 'Nenhum jogo encontrado';
   }
 
-  // Painel da conta abre e fecha com animação
+  // Painel da conta abre e fecha com mola
   useEffect(() => {
-    Animated.timing(menuAnim, {
+    Animated.spring(menuAnim, {
       toValue: menuOpen ? 1 : 0,
-      duration: 180,
       useNativeDriver: NATIVO,
+      tension: 120,
+      friction: 11,
     }).start();
   }, [menuOpen]);
+
+  // Pílula das abas desliza
+  const indiceAba = TABS.indexOf(activeTab);
+  useEffect(() => {
+    Animated.spring(abaAnim, {
+      toValue: indiceAba,
+      useNativeDriver: NATIVO,
+      tension: 140,
+      friction: 14,
+    }).start();
+  }, [indiceAba]);
+
+  // Pílula da barra de baixo desliza (Jogos ou Conta)
+  useEffect(() => {
+    Animated.spring(barraAnim, {
+      toValue: menuOpen ? 3 : 0,
+      useNativeDriver: NATIVO,
+      tension: 140,
+      friction: 14,
+    }).start();
+  }, [menuOpen]);
+
+  // Barra de baixo sobe ao abrir a tela
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(350),
+      Animated.spring(barraEntrada, {
+        toValue: 1,
+        useNativeDriver: NATIVO,
+        tension: 60,
+        friction: 10,
+      }),
+    ]).start();
+  }, []);
 
   // Carrega favoritos e recentes salvos no aparelho
   useEffect(() => {
@@ -313,7 +544,45 @@ export default function HomeScreen({ navigation }) {
     navigation.navigate('Friends');
   }
 
-  const menuDeslizar = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  function focarBusca() {
+    Animated.timing(foco, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+  }
+
+  function desfocarBusca() {
+    Animated.timing(foco, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+  }
+
+  // Valores calculados das animações
+  const larguraAba = larguraTabs > 0 ? (larguraTabs - 8) / TABS.length : 0;
+  const abaTranslate = abaAnim.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: [0, larguraAba, larguraAba * 2],
+  });
+
+  const larguraItem = larguraBarra > 0 ? (larguraBarra - BARRA_PAD * 2) / 4 : 0;
+  const pilulaTranslate = barraAnim.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: [0, larguraItem, larguraItem * 2, larguraItem * 3],
+  });
+
+  const menuOpacity = menuAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const menuY = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
+  const menuEscala = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
+
+  const buscaBorda = foco.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(142,124,240,0)', ACENTO],
+  });
+  const buscaFundo = foco.interpolate({
+    inputRange: [0, 1],
+    outputRange: [SUPERFICIE, SUPERFICIE_CLARA],
+  });
+
+  const barraY = barraEntrada.interpolate({ inputRange: [0, 1], outputRange: [100, 0] });
 
   // espera a fonte carregar
   if (!fontesProntas) {
@@ -322,70 +591,96 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <LinearGradient colors={[FUNDO_TOPO, FUNDO_BASE]} style={{ flex: 1 }}>
+      <FundoOrbes />
+
       <View style={styles.container}>
         {/* Cabeçalho */}
-        <View style={styles.cabecalho}>
-          <Image source={require('../../assets/logo.png')} style={styles.logo} />
+        <Entrada style={styles.cabecalho}>
+          <Animated.Image
+            source={require('../../assets/logo.png')}
+            style={[styles.logo, { transform: [{ translateY: logoFlutua }] }]}
+          />
           <Text style={styles.titulo}>archv.rooms</Text>
-        </View>
+        </Entrada>
 
         {/* Abas */}
-        <View style={styles.tabs}>
-          {TABS.map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {NOME_ABA[tab]}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <Entrada atraso={100}>
+          <View style={styles.tabs} onLayout={(e) => setLarguraTabs(e.nativeEvent.layout.width)}>
+            <Animated.View
+              style={[
+                styles.tabPilula,
+                { width: larguraAba, transform: [{ translateX: abaTranslate }] },
+              ]}
+            />
+            {TABS.map((tab) => (
+              <Toque
+                key={tab}
+                wrapStyle={{ flex: 1 }}
+                style={styles.tab}
+                onPress={() => setActiveTab(tab)}
+                escala={0.92}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                  {NOME_ABA[tab]}
+                </Text>
+              </Toque>
+            ))}
+          </View>
+        </Entrada>
 
-        {erro !== '' && <Text style={styles.erro}>{erro}</Text>}
+        {erro !== '' && (
+          <Entrada key={erro}>
+            <Text style={styles.erro}>{erro}</Text>
+          </Entrada>
+        )}
 
         {/* Busca e filtros */}
         {showCards && (
           <>
-            <View style={styles.busca}>
-              <Ionicons name="search" size={20} color={TEXTO_SUAVE} />
-              <TextInput
-                style={styles.buscaInput}
-                placeholder="Buscar jogo"
-                placeholderTextColor={TEXTO_SUAVE}
-                value={busca}
-                onChangeText={setBusca}
-                autoCapitalize="none"
-              />
-              {busca !== '' && (
-                <TouchableOpacity onPress={() => setBusca('')}>
-                  <Ionicons name="close-circle" size={20} color={TEXTO_SUAVE} />
-                </TouchableOpacity>
-              )}
-            </View>
+            <Entrada atraso={200}>
+              <Animated.View
+                style={[styles.busca, { borderColor: buscaBorda, backgroundColor: buscaFundo }]}
+              >
+                <Ionicons name="search" size={20} color={TEXTO_SUAVE} />
+                <TextInput
+                  style={styles.buscaInput}
+                  placeholder="Buscar jogo"
+                  placeholderTextColor={TEXTO_SUAVE}
+                  value={busca}
+                  onChangeText={setBusca}
+                  onFocus={focarBusca}
+                  onBlur={desfocarBusca}
+                  autoCapitalize="none"
+                />
+                {busca !== '' && (
+                  <Toque onPress={() => setBusca('')} escala={0.8}>
+                    <Ionicons name="close-circle" size={20} color={TEXTO_SUAVE} />
+                  </Toque>
+                )}
+              </Animated.View>
+            </Entrada>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.filtros}
-              contentContainerStyle={{ gap: 8 }}
-            >
-              {consoles.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.filtro, filtro === c && styles.filtroAtivo]}
-                  onPress={() => setFiltro(c)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.filtroTexto, filtro === c && styles.filtroTextoAtivo]}>
-                    {c === 'All' ? 'Todos' : c === 'Favorites' ? 'Favoritos' : c}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <Entrada atraso={280}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.filtros}
+                contentContainerStyle={{ gap: 8 }}
+              >
+                {consoles.map((c) => (
+                  <Toque
+                    key={c}
+                    style={[styles.filtro, filtro === c && styles.filtroAtivo]}
+                    onPress={() => setFiltro(c)}
+                    escala={0.9}
+                  >
+                    <Text style={[styles.filtroTexto, filtro === c && styles.filtroTextoAtivo]}>
+                      {c === 'All' ? 'Todos' : c === 'Favorites' ? 'Favoritos' : c}
+                    </Text>
+                  </Toque>
+                ))}
+              </ScrollView>
+            </Entrada>
           </>
         )}
 
@@ -395,6 +690,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.list}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl
                 refreshing={atualizando}
@@ -416,21 +712,28 @@ export default function HomeScreen({ navigation }) {
             ))}
           </ScrollView>
         ) : (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcone}>
-              <Ionicons
-                name={showCards ? 'game-controller-outline' : 'save-outline'}
-                size={34}
-                color={TEXTO_SUAVE}
-              />
-            </View>
-            <Text style={styles.emptyText}>{textoVazio}</Text>
-          </View>
+          <EstadoVazio
+            key={activeTab + textoVazio}
+            icone={showCards ? 'game-controller-outline' : 'save-outline'}
+            texto={textoVazio}
+          />
         )}
       </View>
 
       {/* Barra de baixo flutuante */}
-      <View style={styles.barra}>
+      <Animated.View
+        style={[styles.barra, { transform: [{ translateY: barraY }] }]}
+        onLayout={(e) => setLarguraBarra(e.nativeEvent.layout.width)}
+      >
+        <Animated.View
+          style={[
+            styles.barraPilula,
+            {
+              left: BARRA_PAD + (larguraItem - PILULA_LARGURA) / 2,
+              transform: [{ translateX: pilulaTranslate }],
+            },
+          ]}
+        />
         <ItemBarra
           icone="game-controller-outline"
           iconeAtivo="game-controller"
@@ -459,7 +762,7 @@ export default function HomeScreen({ navigation }) {
           ativo={menuOpen}
           onPress={() => setMenuOpen(!menuOpen)}
         />
-      </View>
+      </Animated.View>
 
       {/* Fecha o painel ao tocar fora */}
       {menuOpen && (
@@ -471,27 +774,30 @@ export default function HomeScreen({ navigation }) {
         pointerEvents={menuOpen ? 'auto' : 'none'}
         style={[
           styles.menuWrapper,
-          { opacity: menuAnim, transform: [{ translateY: menuDeslizar }] },
+          {
+            opacity: menuOpacity,
+            transform: [{ translateY: menuY }, { scale: menuEscala }],
+          },
         ]}
       >
         <View style={styles.menu}>
-          <TouchableOpacity style={styles.menuItem}>
+          <Toque style={styles.menuItem} escala={0.96}>
             <Ionicons name="settings-outline" size={20} color={BRANCO} />
             <Text style={styles.menuText}>Ajustes</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
+          </Toque>
+          <Toque style={styles.menuItem} escala={0.96}>
             <Ionicons name="information-circle-outline" size={20} color={BRANCO} />
             <Text style={styles.menuText}>Sobre</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem} onPress={limparRecentes}>
+          </Toque>
+          <Toque style={styles.menuItem} onPress={limparRecentes} escala={0.96}>
             <Ionicons name="time-outline" size={20} color={BRANCO} />
             <Text style={styles.menuText}>Limpar recentes</Text>
-          </TouchableOpacity>
+          </Toque>
           <View style={styles.menuDivisor} />
-          <TouchableOpacity style={styles.menuItem} onPress={handleExit}>
+          <Toque style={styles.menuItem} onPress={handleExit} escala={0.96}>
             <Ionicons name="log-out-outline" size={20} color={ERRO} />
             <Text style={[styles.menuText, { color: ERRO }]}>Sair</Text>
-          </TouchableOpacity>
+          </Toque>
         </View>
       </Animated.View>
     </LinearGradient>
@@ -504,6 +810,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
+  },
+
+  // Luzes de fundo
+  orbe1: {
+    position: 'absolute',
+    top: -60,
+    right: -80,
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: 'rgba(142,124,240,0.14)',
+  },
+  orbe2: {
+    position: 'absolute',
+    bottom: 120,
+    left: -100,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(106,91,214,0.12)',
   },
 
   // Cabeçalho
@@ -532,14 +858,23 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 4,
   },
+  tabPilula: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    bottom: 4,
+    borderRadius: 20,
+    backgroundColor: ROXO_BOTAO,
+    shadowColor: ACENTO,
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
   tab: {
-    flex: 1,
     alignItems: 'center',
     paddingVertical: 10,
     borderRadius: 20,
-  },
-  tabActive: {
-    backgroundColor: ROXO_BOTAO,
   },
   tabText: {
     fontFamily: TEXTO_SEMI,
@@ -563,8 +898,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: SUPERFICIE,
     borderRadius: 18,
+    borderWidth: 1.5,
     paddingHorizontal: 16,
     height: 50,
     marginTop: 14,
@@ -610,7 +945,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingBottom: 130,
+    paddingBottom: 150,
   },
   cardWrap: {
     width: '48%',
@@ -619,6 +954,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: SUPERFICIE,
     borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
     overflow: 'hidden',
   },
   thumb: {
@@ -637,10 +974,35 @@ const styles = StyleSheet.create({
     fontFamily: TEXTO_BOLD,
     fontSize: 48,
   },
-  coracao: {
+  thumbSombra: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 54,
+  },
+  play: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: ROXO_BOTAO,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: ACENTO,
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  coracaoWrap: {
     position: 'absolute',
     top: 8,
     right: 8,
+  },
+  coracao: {
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -696,29 +1058,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: 'rgba(36,29,60,0.98)',
     borderRadius: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
     paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: BARRA_PAD,
     shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
     elevation: 12,
   },
+  barraPilula: {
+    position: 'absolute',
+    top: 10,
+    width: PILULA_LARGURA,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: ROXO_BOTAO,
+    shadowColor: ACENTO,
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
   barraItem: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
   },
   barraIcone: {
-    width: 56,
+    width: PILULA_LARGURA,
     height: 34,
-    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  barraIconeAtivo: {
-    backgroundColor: ROXO_BOTAO,
   },
   barraTexto: {
     fontFamily: TEXTO_SEMI,
@@ -741,6 +1113,8 @@ const styles = StyleSheet.create({
     backgroundColor: SUPERFICIE_CLARA,
     borderRadius: 20,
     paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 12,
