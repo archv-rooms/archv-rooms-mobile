@@ -397,6 +397,11 @@ export default function HomeScreen({ navigation }) {
                 onChangeText={setBusca}
                 autoCapitalize="none"
               />
+              {busca !== '' && (
+                <TouchableOpacity onPress={() => setBusca('')}>
+                  <Ionicons name="close-circle" size={20} color={TEXTO_SUAVE} />
+                </TouchableOpacity>
+              )}
             </View>
 
             <Text style={styles.contador}>
