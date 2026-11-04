@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  ActivityIndicator,
   Animated,
   Image,
 } from 'react-native';
@@ -20,9 +19,6 @@ import {
   Rajdhani_600SemiBold,
   Rajdhani_700Bold,
 } from '@expo-google-fonts/rajdhani';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api, { TOKEN_KEY } from '../services/api';
-import { MODO_TESTE } from '../services/mock';
 
 const NATIVE = Platform.OS !== 'web';
 
@@ -32,7 +28,6 @@ const COLORS = {
   button: '#6A5BD6',
   accent: '#8E7CF0',
   softText: '#B8B0C8',
-  error: '#FF9AA8',
 };
 
 const FONT = {
@@ -51,12 +46,9 @@ export default function SignInScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [focus, setFocus] = useState('');
 
   const fade = useRef(new Animated.Value(0)).current;
-  const shake = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(fade, {
@@ -66,70 +58,8 @@ export default function SignInScreen({ navigation }) {
     }).start();
   }, []);
 
-  function shakeForm() {
-    Animated.sequence([
-      Animated.timing(shake, { toValue: 8, duration: 60, useNativeDriver: NATIVE }),
-      Animated.timing(shake, { toValue: -8, duration: 60, useNativeDriver: NATIVE }),
-      Animated.timing(shake, { toValue: 6, duration: 60, useNativeDriver: NATIVE }),
-      Animated.timing(shake, { toValue: -6, duration: 60, useNativeDriver: NATIVE }),
-      Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: NATIVE }),
-    ]).start();
-  }
-
-  function showError(message) {
-    setError(message);
-    shakeForm();
-  }
-
-  async function handleLogin() {
-    if (loading) return;
-
-    if (!email.trim() || !password) {
-      showError('Preencha o e-mail e a senha.');
-      return;
-    }
-
-    setError('');
-    setLoading(true);
-
-    if (MODO_TESTE) {
-      await AsyncStorage.setItem(TOKEN_KEY, 'token-de-teste');
-      setLoading(false);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-      return;
-    }
-
-    try {
-      const response = await api.post(
-        '/auth/login',
-        { email: email.trim(), password },
-        { timeout: 90000 }
-      );
-
-      const token = response?.data?.data?.token;
-
-      if (!token) {
-        showError('Resposta inesperada do servidor. Tente novamente.');
-        return;
-      }
-
-      await AsyncStorage.setItem(TOKEN_KEY, token);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-    } catch (err) {
-      const apiMessage = err?.response?.data?.message;
-
-      if (apiMessage) {
-        showError(apiMessage);
-      } else if (err?.code === 'ECONNABORTED') {
-        showError('O servidor demorou para responder. Tente novamente.');
-      } else {
-        showError(
-          'Não foi possível conectar ao servidor. Se for a primeira vez, aguarde um minuto e tente de novo.'
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
+  function handleLogin() {
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }
 
   if (!fontsReady) {
@@ -164,7 +94,7 @@ export default function SignInScreen({ navigation }) {
             <Text style={styles.subtitle}>Log in to continue playing</Text>
           </Animated.View>
 
-          <Animated.View style={{ opacity: fade, transform: [{ translateX: shake }] }}>
+          <Animated.View style={{ opacity: fade }}>
             <View style={[styles.field, focus === 'email' && styles.fieldFocus]}>
               <Ionicons name="mail-outline" size={20} color={COLORS.softText} />
               <TextInput
@@ -177,7 +107,6 @@ export default function SignInScreen({ navigation }) {
                 onBlur={() => setFocus('')}
                 autoCapitalize="none"
                 keyboardType="email-address"
-                editable={!loading}
               />
             </View>
 
@@ -193,7 +122,6 @@ export default function SignInScreen({ navigation }) {
                 onBlur={() => setFocus('')}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
-                editable={!loading}
                 onSubmitEditing={handleLogin}
               />
               <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -212,19 +140,12 @@ export default function SignInScreen({ navigation }) {
               <Text style={styles.forgot}>Forgot password?</Text>
             </TouchableOpacity>
 
-            {error !== '' && <Text style={styles.error}>{error}</Text>}
-
             <TouchableOpacity
-              style={[styles.loginButton, loading && { opacity: 0.7 }]}
+              style={styles.loginButton}
               onPress={handleLogin}
-              disabled={loading}
               activeOpacity={0.85}
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.loginText}>Log in</Text>
-              )}
+              <Text style={styles.loginText}>Log in</Text>
             </TouchableOpacity>
           </Animated.View>
 
@@ -321,13 +242,6 @@ const styles = StyleSheet.create({
     fontFamily: FONT.semi,
     color: COLORS.softText,
     fontSize: 16,
-  },
-  error: {
-    fontFamily: FONT.semi,
-    color: COLORS.error,
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 14,
   },
   loginButton: {
     backgroundColor: COLORS.button,
