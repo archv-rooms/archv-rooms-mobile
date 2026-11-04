@@ -310,6 +310,12 @@ export default function HomeScreen({ navigation }) {
     AsyncStorage.setItem(RECENTES_KEY, JSON.stringify(novos)).catch(() => {});
   }
 
+  function limparRecentes() {
+    setRecentes([]);
+    AsyncStorage.removeItem(RECENTES_KEY).catch(() => {});
+    setMenuOpen(false);
+  }
+
   async function abrirJogo(jogo) {
     if (jogo.exemplo) {
       setErro('Este é um cartão de exemplo. Os jogos reais aparecem quando a API voltar.');
@@ -478,6 +484,9 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem}>
               <Text style={styles.menuText}>About</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuItem} onPress={limparRecentes}>
+              <Text style={styles.menuText}>Clear recent</Text>
             </TouchableOpacity>
             <View style={styles.menuDivisor} />
             <TouchableOpacity style={styles.menuItem} onPress={handleExit}>
