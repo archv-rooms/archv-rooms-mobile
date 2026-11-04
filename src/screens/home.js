@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
@@ -24,6 +25,10 @@ const NATIVO = Platform.OS !== 'web';
 const TEXTO = 'Rajdhani_500Medium';
 const TEXTO_SEMI = 'Rajdhani_600SemiBold';
 const TEXTO_BOLD = 'Rajdhani_700Bold';
+
+const FAVORITOS_KEY = 'favoritos';
+const RECENTES_KEY = 'recentes';
+const MAX_RECENTES = 10;
 
 // Mesmas cores das telas de login e cadastro
 const ACENTO = '#8E7CF0';
@@ -133,7 +138,7 @@ function FundoLetras() {
   );
 }
 
-function CartaoJogo({ jogo, indice, onPress }) {
+function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
   const entrada = useRef(new Animated.Value(0)).current;
   const [imagemFalhou, setImagemFalhou] = useState(false);
 
@@ -169,6 +174,14 @@ function CartaoJogo({ jogo, indice, onPress }) {
           </View>
         )}
 
+        <TouchableOpacity style={styles.coracao} onPress={onFavorito} activeOpacity={0.7}>
+          <Ionicons
+            name={favorito ? 'heart' : 'heart-outline'}
+            size={18}
+            color={favorito ? '#FF6B8A' : '#fff'}
+          />
+        </TouchableOpacity>
+
         <View style={styles.cardInfo}>
           <Text style={styles.cardText} numberOfLines={2}>
             {jogo.title}
@@ -196,11 +209,36 @@ export default function HomeScreen({ navigation }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [games, setGames] = useState(EXEMPLOS);
   const [erro, setErro] = useState('');
+  const [busca, setBusca] = useState('');
+  const [filtro, setFiltro] = useState('All');
+  const [favoritos, setFavoritos] = useState([]);
+  const [recentes, setRecentes] = useState([]);
 
   const menuAnim = useRef(new Animated.Value(0)).current;
 
   const showCards = activeTab === 'Recent' || activeTab === 'Games';
   const lista = Array.isArray(games) ? games : [];
+
+  // Na aba Recent só aparecem os jogos abertos, do mais novo para o mais antigo
+  const base =
+    activeTab === 'Recent'
+      ? recentes.map((id) => lista.find((j) => j.id === id)).filter(Boolean)
+      : lista;
+
+  const consoles = ['All', 'Favorites', ...new Set(lista.map((j) => j.console).filter(Boolean))];
+
+  const filtrados = base.filter((j) => {
+    const nomeBate = (j.title || '').toLowerCase().includes(busca.trim().toLowerCase());
+    let filtroBate = true;
+    if (filtro === 'Favorites') filtroBate = favoritos.includes(j.id);
+    else if (filtro !== 'All') filtroBate = j.console === filtro;
+    return nomeBate && filtroBate;
+  });
+
+  let textoVazio = 'No saves yet';
+  if (showCards) {
+    textoVazio = activeTab === 'Recent' && recentes.length === 0 ? 'No recent games' : 'No games found';
+  }
 
   // Menu abre e fecha com animação
   useEffect(() => {
@@ -210,6 +248,21 @@ export default function HomeScreen({ navigation }) {
       useNativeDriver: NATIVO,
     }).start();
   }, [menuOpen]);
+
+  // Carrega favoritos e recentes salvos no aparelho
+  useEffect(() => {
+    async function carregarSalvos() {
+      try {
+        const fav = await AsyncStorage.getItem(FAVORITOS_KEY);
+        const rec = await AsyncStorage.getItem(RECENTES_KEY);
+        if (fav) setFavoritos(JSON.parse(fav));
+        if (rec) setRecentes(JSON.parse(rec));
+      } catch (e) {
+        // sem dados salvos, segue vazio
+      }
+    }
+    carregarSalvos();
+  }, []);
 
   useEffect(() => {
     async function carregarJogos() {
@@ -243,6 +296,20 @@ export default function HomeScreen({ navigation }) {
     carregarJogos();
   }, []);
 
+  function alternarFavorito(id) {
+    const novos = favoritos.includes(id)
+      ? favoritos.filter((f) => f !== id)
+      : [...favoritos, id];
+    setFavoritos(novos);
+    AsyncStorage.setItem(FAVORITOS_KEY, JSON.stringify(novos)).catch(() => {});
+  }
+
+  function guardarRecente(id) {
+    const novos = [id, ...recentes.filter((r) => r !== id)].slice(0, MAX_RECENTES);
+    setRecentes(novos);
+    AsyncStorage.setItem(RECENTES_KEY, JSON.stringify(novos)).catch(() => {});
+  }
+
   async function abrirJogo(jogo) {
     if (jogo.exemplo) {
       setErro('Este é um cartão de exemplo. Os jogos reais aparecem quando a API voltar.');
@@ -254,6 +321,7 @@ export default function HomeScreen({ navigation }) {
         const res = await api.get('/games/' + jogo.id);
         completo = res.data && res.data.data ? res.data.data : jogo;
       }
+      guardarRecente(jogo.id);
       navigation.navigate('Game', { game: completo });
     } catch (e) {
       let msg = 'Não foi possível abrir o jogo.';
@@ -316,26 +384,65 @@ export default function HomeScreen({ navigation }) {
 
         {erro !== '' && <Text style={styles.erro}>{erro}</Text>}
 
+        {/* Busca e filtros */}
+        {showCards && (
+          <>
+            <View style={styles.busca}>
+              <Ionicons name="search-outline" size={20} color={TEXTO_SUAVE} />
+              <TextInput
+                style={styles.buscaInput}
+                placeholder="Search games"
+                placeholderTextColor={TEXTO_SUAVE}
+                value={busca}
+                onChangeText={setBusca}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filtros}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {consoles.map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.filtro, filtro === c && styles.filtroAtivo]}
+                  onPress={() => setFiltro(c)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.filtroTexto, filtro === c && styles.filtroTextoAtivo]}>
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         {/* Conteúdo da aba */}
-        {showCards ? (
+        {showCards && filtrados.length > 0 ? (
           <ScrollView
             style={styles.list}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           >
-            {lista.map((jogo, i) => (
+            {filtrados.map((jogo, i) => (
               <CartaoJogo
                 key={activeTab + String(jogo.id)}
                 jogo={jogo}
                 indice={i}
+                favorito={favoritos.includes(jogo.id)}
                 onPress={() => abrirJogo(jogo)}
+                onFavorito={() => alternarFavorito(jogo.id)}
               />
             ))}
           </ScrollView>
         ) : (
           <View style={styles.empty}>
-            <Ionicons name="save-outline" size={36} color={TEXTO_SUAVE} />
-            <Text style={styles.emptyText}>No saves yet</Text>
+            <Ionicons name={showCards ? 'game-controller-outline' : 'save-outline'} size={36} color={TEXTO_SUAVE} />
+            <Text style={styles.emptyText}>{textoVazio}</Text>
           </View>
         )}
 
@@ -435,9 +542,50 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 12,
   },
+  busca: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: SUPERFICIE,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    marginTop: 16,
+  },
+  buscaInput: {
+    flex: 1,
+    height: '100%',
+    color: '#fff',
+    fontFamily: TEXTO_SEMI,
+    fontSize: 17,
+  },
+  filtros: {
+    flexGrow: 0,
+    marginTop: 12,
+  },
+  filtro: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  filtroAtivo: {
+    backgroundColor: ACENTO,
+    borderColor: ACENTO,
+  },
+  filtroTexto: {
+    fontFamily: TEXTO_SEMI,
+    color: TEXTO_SUAVE,
+    fontSize: 15,
+  },
+  filtroTextoAtivo: {
+    color: '#fff',
+    fontFamily: TEXTO_BOLD,
+  },
   list: {
     flex: 1,
-    marginTop: 20,
+    marginTop: 16,
   },
   listContent: {
     flexDirection: 'row',
@@ -465,6 +613,17 @@ const styles = StyleSheet.create({
   cardInicial: {
     fontFamily: TEXTO_BOLD,
     fontSize: 40,
+  },
+  coracao: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardInfo: {
     paddingHorizontal: 12,
