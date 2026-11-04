@@ -22,6 +22,7 @@ import api, { TOKEN_KEY } from '../services/api';
 import { MODO_TESTE, JOGOS_TESTE } from '../services/mock';
 
 const TABS = ['Recent', 'Games', 'Saves'];
+const NOME_ABA = { Recent: 'Recentes', Games: 'Jogos', Saves: 'Saves' };
 const NATIVO = Platform.OS !== 'web';
 const TEXTO = 'Rajdhani_500Medium';
 const TEXTO_SEMI = 'Rajdhani_600SemiBold';
@@ -31,12 +32,17 @@ const FAVORITOS_KEY = 'favoritos';
 const RECENTES_KEY = 'recentes';
 const MAX_RECENTES = 10;
 
-// Mesmas cores das telas de login e cadastro
+// Cores
+const FUNDO_TOPO = '#14111F';
+const FUNDO_BASE = '#221B38';
+const SUPERFICIE = '#2D2545';
+const SUPERFICIE_CLARA = '#3A3058';
 const ACENTO = '#8E7CF0';
 const ROXO_BOTAO = '#6A5BD6';
-const FUNDO_ESCURO = '#1E1830';
-const SUPERFICIE = '#4B4163';
-const TEXTO_SUAVE = '#B8B0C8';
+const BRANCO = '#FFFFFF';
+const TEXTO_SUAVE = '#B4AACB';
+const ROSA = '#FF6B8A';
+const ERRO = '#FF9AA8';
 
 // Cartões de exemplo, usados só se a API não responder
 const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
@@ -45,7 +51,7 @@ const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
   exemplo: true,
 }));
 
-// Cor de cada console (só um pontinho discreto)
+// Cor de cada console (usada só quando o jogo não tem imagem)
 const COR_CONSOLE = {
   NES: '#FF4D4D',
   SNES: '#9B8CFF',
@@ -61,82 +67,7 @@ const COR_CONSOLE = {
 };
 
 function corDoConsole(nome) {
-  return COR_CONSOLE[(nome || '').toUpperCase()] || '#8E7CF0';
-}
-
-// Letras de "ARCHV ROOMS" flutuando no fundo
-const TEXTO_LETRAS = 'ARCHVROOMS';
-const QTD_LETRAS = 40;
-
-// Número "aleatório" fixo, para as letras não mudarem de lugar a cada render
-function pseudo(n) {
-  const x = Math.sin(n * 12.9898) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-const LETRAS = Array.from({ length: QTD_LETRAS }, (_, i) => ({
-  l: TEXTO_LETRAS[i % TEXTO_LETRAS.length],
-  top: pseudo(i + 1) * 94 + '%',
-  left: pseudo(i + 101) * 92 + '%',
-  tam: 16 + Math.round(pseudo(i + 201) * 20),
-  rot: Math.round(pseudo(i + 301) * 40 - 20) + 'deg',
-  amp: 5 + Math.round(pseudo(i + 401) * 7),
-  dur: 3500 + Math.round(pseudo(i + 501) * 3000),
-  op: 0.1 + pseudo(i + 601) * 0.12,
-}));
-
-function LetraFlutuante({ config }) {
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: config.dur,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVO,
-        }),
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: config.dur,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVO,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  const subir = anim.interpolate({ inputRange: [0, 1], outputRange: [0, -config.amp] });
-
-  return (
-    <Animated.Text
-      style={{
-        position: 'absolute',
-        top: config.top,
-        left: config.left,
-        fontFamily: TEXTO_BOLD,
-        fontSize: config.tam,
-        color: '#B8A9FF',
-        opacity: config.op,
-        transform: [{ translateY: subir }, { rotate: config.rot }],
-      }}
-    >
-      {config.l}
-    </Animated.Text>
-  );
-}
-
-function FundoLetras() {
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {LETRAS.map((cfg, i) => (
-        <LetraFlutuante key={i} config={cfg} />
-      ))}
-    </View>
-  );
+  return COR_CONSOLE[(nome || '').toUpperCase()] || ACENTO;
 }
 
 function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
@@ -147,7 +78,7 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
     Animated.timing(entrada, {
       toValue: 1,
       duration: 350,
-      delay: indice * 60,
+      delay: indice * 50,
       useNativeDriver: NATIVO,
     }).start();
   }, []);
@@ -160,39 +91,36 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
     <Animated.View style={[styles.cardWrap, { opacity: entrada }]}>
       <Pressable
         onPress={onPress}
-        style={({ pressed }) => [styles.card, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [styles.card, pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] }]}
       >
-        {temImagem ? (
-          <Image
-            source={{ uri: jogo.image }}
-            style={styles.cardImage}
-            fadeDuration={0}
-            onError={() => setImagemFalhou(true)}
-          />
-        ) : (
-          <View style={[styles.cardImage, styles.cardSemImagem, { backgroundColor: cor + '26' }]}>
-            <Text style={[styles.cardInicial, { color: cor }]}>{inicial}</Text>
-          </View>
-        )}
+        <View style={styles.thumb}>
+          {temImagem ? (
+            <Image
+              source={{ uri: jogo.image }}
+              style={styles.thumbImg}
+              fadeDuration={0}
+              onError={() => setImagemFalhou(true)}
+            />
+          ) : (
+            <View style={[styles.thumbImg, styles.thumbVazia, { backgroundColor: cor + '30' }]}>
+              <Text style={[styles.thumbInicial, { color: cor }]}>{inicial}</Text>
+            </View>
+          )}
 
-        <TouchableOpacity style={styles.coracao} onPress={onFavorito} activeOpacity={0.7}>
-          <Ionicons
-            name={favorito ? 'heart' : 'heart-outline'}
-            size={18}
-            color={favorito ? '#FF6B8A' : '#fff'}
-          />
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.coracao} onPress={onFavorito} activeOpacity={0.7}>
+            <Ionicons
+              name={favorito ? 'heart' : 'heart-outline'}
+              size={18}
+              color={favorito ? ROSA : BRANCO}
+            />
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.cardInfo}>
-          <Text style={styles.cardText} numberOfLines={2}>
+          <Text style={styles.cardTitulo} numberOfLines={1}>
             {jogo.title}
           </Text>
-          {jogo.console ? (
-            <View style={styles.consoleRow}>
-              <View style={[styles.consoleDot, { backgroundColor: cor }]} />
-              <Text style={styles.consoleText}>{jogo.console}</Text>
-            </View>
-          ) : null}
+          {jogo.console ? <Text style={styles.cardConsole}>{jogo.console}</Text> : null}
         </View>
       </Pressable>
     </Animated.View>
@@ -203,11 +131,13 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
 function ItemBarra({ icone, iconeAtivo, texto, ativo, onPress }) {
   return (
     <TouchableOpacity style={styles.barraItem} onPress={onPress} activeOpacity={0.7}>
-      <Ionicons
-        name={ativo ? iconeAtivo : icone}
-        size={24}
-        color={ativo ? '#fff' : TEXTO_SUAVE}
-      />
+      <View style={[styles.barraIcone, ativo && styles.barraIconeAtivo]}>
+        <Ionicons
+          name={ativo ? iconeAtivo : icone}
+          size={24}
+          color={ativo ? BRANCO : TEXTO_SUAVE}
+        />
+      </View>
       <Text style={[styles.barraTexto, ativo && styles.barraTextoAtivo]}>{texto}</Text>
     </TouchableOpacity>
   );
@@ -251,9 +181,10 @@ export default function HomeScreen({ navigation }) {
     return nomeBate && filtroBate;
   });
 
-  let textoVazio = 'No saves yet';
+  let textoVazio = 'Nenhum save ainda';
   if (showCards) {
-    textoVazio = activeTab === 'Recent' && recentes.length === 0 ? 'No recent games' : 'No games found';
+    textoVazio =
+      activeTab === 'Recent' && recentes.length === 0 ? 'Nenhum jogo recente' : 'Nenhum jogo encontrado';
   }
 
   // Painel da conta abre e fecha com animação
@@ -386,35 +317,32 @@ export default function HomeScreen({ navigation }) {
 
   // espera a fonte carregar
   if (!fontesProntas) {
-    return <View style={{ flex: 1, backgroundColor: FUNDO_ESCURO }} />;
+    return <View style={{ flex: 1, backgroundColor: FUNDO_TOPO }} />;
   }
 
   return (
-    <LinearGradient colors={['#1E1830', '#3A2F55', '#5B4A7A']} style={{ flex: 1 }}>
-      <FundoLetras />
+    <LinearGradient colors={[FUNDO_TOPO, FUNDO_BASE]} style={{ flex: 1 }}>
       <View style={styles.container}>
-        {/* Logo + Título */}
-        <View style={styles.tituloBox}>
+        {/* Cabeçalho */}
+        <View style={styles.cabecalho}>
           <Image source={require('../../assets/logo.png')} style={styles.logo} />
-          <Text style={styles.titulo}>Archv Rooms</Text>
+          <Text style={styles.titulo}>archv.rooms</Text>
         </View>
 
         {/* Abas */}
-        <View style={styles.header}>
-          <View style={styles.tabs}>
-            {TABS.map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tab, activeTab === tab && styles.tabActive]}
-                onPress={() => setActiveTab(tab)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={styles.tabs}>
+          {TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {NOME_ABA[tab]}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {erro !== '' && <Text style={styles.erro}>{erro}</Text>}
@@ -423,10 +351,10 @@ export default function HomeScreen({ navigation }) {
         {showCards && (
           <>
             <View style={styles.busca}>
-              <Ionicons name="search-outline" size={20} color={TEXTO_SUAVE} />
+              <Ionicons name="search" size={20} color={TEXTO_SUAVE} />
               <TextInput
                 style={styles.buscaInput}
-                placeholder="Search games"
+                placeholder="Buscar jogo"
                 placeholderTextColor={TEXTO_SUAVE}
                 value={busca}
                 onChangeText={setBusca}
@@ -438,10 +366,6 @@ export default function HomeScreen({ navigation }) {
                 </TouchableOpacity>
               )}
             </View>
-
-            <Text style={styles.contador}>
-              {filtrados.length} {filtrados.length === 1 ? 'game' : 'games'}
-            </Text>
 
             <ScrollView
               horizontal
@@ -457,7 +381,7 @@ export default function HomeScreen({ navigation }) {
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.filtroTexto, filtro === c && styles.filtroTextoAtivo]}>
-                    {c}
+                    {c === 'All' ? 'Todos' : c === 'Favorites' ? 'Favoritos' : c}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -493,39 +417,45 @@ export default function HomeScreen({ navigation }) {
           </ScrollView>
         ) : (
           <View style={styles.empty}>
-            <Ionicons name={showCards ? 'game-controller-outline' : 'save-outline'} size={36} color={TEXTO_SUAVE} />
+            <View style={styles.emptyIcone}>
+              <Ionicons
+                name={showCards ? 'game-controller-outline' : 'save-outline'}
+                size={34}
+                color={TEXTO_SUAVE}
+              />
+            </View>
             <Text style={styles.emptyText}>{textoVazio}</Text>
           </View>
         )}
       </View>
 
-      {/* Barra de baixo */}
+      {/* Barra de baixo flutuante */}
       <View style={styles.barra}>
         <ItemBarra
           icone="game-controller-outline"
           iconeAtivo="game-controller"
-          texto="Games"
+          texto="Jogos"
           ativo={!menuOpen}
           onPress={irParaGames}
         />
         <ItemBarra
           icone="people-outline"
           iconeAtivo="people"
-          texto="Friends"
+          texto="Amigos"
           ativo={false}
           onPress={irParaAmigos}
         />
         <ItemBarra
           icone="albums-outline"
           iconeAtivo="albums"
-          texto="Rooms"
+          texto="Salas"
           ativo={false}
           onPress={() => setMenuOpen(false)}
         />
         <ItemBarra
           icone="person-circle-outline"
           iconeAtivo="person-circle"
-          texto="Account"
+          texto="Conta"
           ativo={menuOpen}
           onPress={() => setMenuOpen(!menuOpen)}
         />
@@ -546,20 +476,21 @@ export default function HomeScreen({ navigation }) {
       >
         <View style={styles.menu}>
           <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>Settings</Text>
+            <Ionicons name="settings-outline" size={20} color={BRANCO} />
+            <Text style={styles.menuText}>Ajustes</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>archvrooms</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.menuItem}>
-            <Text style={styles.menuText}>About</Text>
+            <Ionicons name="information-circle-outline" size={20} color={BRANCO} />
+            <Text style={styles.menuText}>Sobre</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuItem} onPress={limparRecentes}>
-            <Text style={styles.menuText}>Clear recent</Text>
+            <Ionicons name="time-outline" size={20} color={BRANCO} />
+            <Text style={styles.menuText}>Limpar recentes</Text>
           </TouchableOpacity>
           <View style={styles.menuDivisor} />
           <TouchableOpacity style={styles.menuItem} onPress={handleExit}>
-            <Text style={[styles.menuText, { color: '#FF9AA8' }]}>Exit</Text>
+            <Ionicons name="log-out-outline" size={20} color={ERRO} />
+            <Text style={[styles.menuText, { color: ERRO }]}>Sair</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>
@@ -572,40 +503,40 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 4,
+    paddingTop: Platform.OS === 'ios' ? 60 : 50,
   },
-  tituloBox: {
+
+  // Cabeçalho
+  cabecalho: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 24,
+    gap: 10,
+    marginBottom: 18,
   },
   logo: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     resizeMode: 'contain',
   },
   titulo: {
     fontFamily: TEXTO_BOLD,
-    color: '#fff',
+    color: BRANCO,
     fontSize: 28,
     letterSpacing: 0.5,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+
+  // Abas
   tabs: {
     flexDirection: 'row',
-    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 24,
+    padding: 4,
   },
   tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: SUPERFICIE,
   },
   tabActive: {
     backgroundColor: ROXO_BOTAO,
@@ -613,65 +544,64 @@ const styles = StyleSheet.create({
   tabText: {
     fontFamily: TEXTO_SEMI,
     color: TEXTO_SUAVE,
-    fontSize: 16,
+    fontSize: 17,
   },
   tabTextActive: {
-    color: '#fff',
+    color: BRANCO,
     fontFamily: TEXTO_BOLD,
   },
+
   erro: {
     fontFamily: TEXTO,
-    color: '#FF9AA8',
+    color: ERRO,
     fontSize: 15,
     marginTop: 12,
   },
+
+  // Busca
   busca: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     backgroundColor: SUPERFICIE,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    marginTop: 16,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    height: 50,
+    marginTop: 14,
   },
   buscaInput: {
     flex: 1,
     height: '100%',
-    color: '#fff',
+    color: BRANCO,
     fontFamily: TEXTO_SEMI,
-    fontSize: 17,
+    fontSize: 18,
   },
-  contador: {
-    fontFamily: TEXTO_SEMI,
-    color: TEXTO_SUAVE,
-    fontSize: 14,
-    marginTop: 10,
-  },
+
+  // Filtros
   filtros: {
     flexGrow: 0,
     marginTop: 12,
   },
   filtro: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: SUPERFICIE,
   },
   filtroAtivo: {
     backgroundColor: ACENTO,
-    borderColor: ACENTO,
   },
   filtroTexto: {
     fontFamily: TEXTO_SEMI,
     color: TEXTO_SUAVE,
-    fontSize: 15,
+    fontSize: 16,
   },
   filtroTextoAtivo: {
-    color: '#fff',
+    color: BRANCO,
     fontFamily: TEXTO_BOLD,
   },
+
+  // Lista e cartões
   list: {
     flex: 1,
     marginTop: 16,
@@ -680,37 +610,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingBottom: 20,
+    paddingBottom: 130,
   },
   cardWrap: {
     width: '48%',
-    marginBottom: 18,
+    marginBottom: 16,
   },
   card: {
     backgroundColor: SUPERFICIE,
-    borderRadius: 14,
+    borderRadius: 22,
     overflow: 'hidden',
   },
-  cardImage: {
-    height: 110,
+  thumb: {
     width: '100%',
+    aspectRatio: 1.15,
   },
-  cardSemImagem: {
+  thumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbVazia: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardInicial: {
+  thumbInicial: {
     fontFamily: TEXTO_BOLD,
-    fontSize: 40,
+    fontSize: 48,
   },
   coracao: {
     position: 'absolute',
     top: 8,
     right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -718,58 +652,73 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 12,
-    minHeight: 68,
   },
-  cardText: {
+  cardTitulo: {
     fontFamily: TEXTO_BOLD,
-    color: '#fff',
-    fontSize: 16,
-    lineHeight: 19,
+    color: BRANCO,
+    fontSize: 17,
   },
-  consoleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  consoleDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  consoleText: {
+  cardConsole: {
     fontFamily: TEXTO_SEMI,
     color: TEXTO_SUAVE,
-    fontSize: 13,
+    fontSize: 14,
+    marginTop: 1,
   },
+
+  // Estado vazio
   empty: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 14,
+    paddingBottom: 100,
+  },
+  emptyIcone: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     fontFamily: TEXTO_SEMI,
     color: TEXTO_SUAVE,
-    fontSize: 17,
+    fontSize: 18,
   },
 
-  // Barra de baixo
+  // Barra de baixo flutuante
   barra: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: Platform.OS === 'ios' ? 28 : 16,
     flexDirection: 'row',
-    backgroundColor: '#2A2142',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.10)',
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+    backgroundColor: 'rgba(36,29,60,0.98)',
+    borderRadius: 30,
+    paddingVertical: 10,
     paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
   },
   barraItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    paddingVertical: 4,
+  },
+  barraIcone: {
+    width: 56,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  barraIconeAtivo: {
+    backgroundColor: ROXO_BOTAO,
   },
   barraTexto: {
     fontFamily: TEXTO_SEMI,
@@ -777,35 +726,43 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   barraTextoAtivo: {
-    color: '#fff',
+    color: BRANCO,
     fontFamily: TEXTO_BOLD,
   },
 
-  // Painel da conta (aparece em cima do botão Account)
+  // Painel da conta (aparece em cima do botão Conta)
   menuWrapper: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 100 : 88,
-    right: 16,
-    width: 190,
+    bottom: Platform.OS === 'ios' ? 112 : 100,
+    right: 20,
+    width: 210,
   },
   menu: {
-    backgroundColor: '#5A4E75',
-    borderRadius: 14,
+    backgroundColor: SUPERFICIE_CLARA,
+    borderRadius: 20,
     paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
   },
   menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingVertical: 12,
   },
   menuText: {
     fontFamily: TEXTO_SEMI,
-    color: '#fff',
+    color: BRANCO,
     fontSize: 17,
   },
   menuDivisor: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     marginVertical: 4,
-    marginHorizontal: 12,
+    marginHorizontal: 14,
   },
 });
