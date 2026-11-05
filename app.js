@@ -13,7 +13,7 @@ import ChatScreen from './src/screens/chat';
 import RoomsScreen from './src/screens/rooms';
 import SettingsScreen from './src/screens/settings';
 import AboutScreen from './src/screens/about';
-import OnboardingScreen from './src/screens/onboarding';
+import OnboardingScreen, { ONBOARDING_KEY } from './src/screens/onboarding';
 import BottomTabBar from './src/components/BottomTabBar';
 import { TOKEN_KEY } from './src/services/api';
 
@@ -23,9 +23,21 @@ const navigationRef = createNavigationContainerRef();
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState('SignIn');
 
-  function updateCurrentRoute() {
+  async function updateCurrentRoute() {
     const route = navigationRef.getCurrentRoute();
-    if (route) setCurrentRoute(route.name);
+    if (!route) return;
+    setCurrentRoute(route.name);
+
+    // First time reaching Home after login: show the onboarding once
+    if (route.name === 'Home') {
+      let seen = null;
+      try {
+        seen = await AsyncStorage.getItem(ONBOARDING_KEY);
+      } catch (e) {}
+      if (!seen) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
+      }
+    }
   }
 
   async function signOut() {

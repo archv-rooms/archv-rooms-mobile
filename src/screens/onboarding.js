@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
+
+export const ONBOARDING_KEY = 'onboarding_seen_v1';
 
 const FONT_SEMI = 'Rajdhani_600SemiBold';
 const FONT_BOLD = 'Rajdhani_700Bold';
@@ -41,8 +44,12 @@ export default function OnboardingScreen({ navigation, route }) {
   const isLast = index === SLIDES.length - 1;
   const slide = SLIDES[index];
 
-  // After sign up the user still has to confirm the e-mail, so go to login
-  function finish() {
+  // Marks the onboarding as seen. After sign up the user still has to
+  // confirm the e-mail, so go to login; otherwise go to Home.
+  async function finish() {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, '1');
+    } catch (e) {}
     const target = fromSignUp ? 'SignIn' : 'Home';
     navigation.reset({ index: 0, routes: [{ name: target }] });
   }
