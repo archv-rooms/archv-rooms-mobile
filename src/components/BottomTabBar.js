@@ -19,7 +19,7 @@ const PILL_WIDTH = 56;
 const BAR_PADDING = 8;
 
 // Screens where the bar is visible, and the tab index of each one
-const TAB_INDEX = { Home: 0, Friends: 1, Rooms: 2 };
+const TAB_INDEX = { Home: 0, Friends: 1, Rooms: 2, Settings: 3, About: 3 };
 
 // Button that shrinks when pressed and springs back
 function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93 }) {
@@ -73,6 +73,7 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
   const visible = TAB_INDEX[currentRoute] !== undefined;
   const routeIndex = visible ? TAB_INDEX[currentRoute] : 0;
   const activeIndex = menuOpen ? 3 : routeIndex;
+  const accountActive = menuOpen || currentRoute === 'Settings' || currentRoute === 'About';
 
   const pillAnim = useRef(new Animated.Value(0)).current;
   const enterAnim = useRef(new Animated.Value(0)).current;
@@ -141,11 +142,11 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
         ]}
       >
         <View style={styles.menu}>
-          <PressableScale style={styles.menuItem} scale={0.96}>
+          <PressableScale style={styles.menuItem} onPress={() => goTo('Settings')} scale={0.96}>
             <Ionicons name="settings-outline" size={20} color={WHITE} />
             <Text style={styles.menuText}>Ajustes</Text>
           </PressableScale>
-          <PressableScale style={styles.menuItem} scale={0.96}>
+          <PressableScale style={styles.menuItem} onPress={() => goTo('About')} scale={0.96}>
             <Ionicons name="information-circle-outline" size={20} color={WHITE} />
             <Text style={styles.menuText}>Sobre</Text>
           </PressableScale>
@@ -204,7 +205,7 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
           icon="person-circle-outline"
           activeIcon="person-circle"
           label="Conta"
-          active={menuOpen}
+          active={accountActive}
           onPress={() => setMenuOpen(!menuOpen)}
         />
       </Animated.View>

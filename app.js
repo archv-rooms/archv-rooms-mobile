@@ -12,6 +12,8 @@ import GameScreen from './src/screens/game';
 import FriendsScreen from './src/screens/friends';
 import ChatScreen from './src/screens/chat';
 import RoomsScreen from './src/screens/rooms';
+import SettingsScreen from './src/screens/settings';
+import AboutScreen from './src/screens/about';
 import BottomTabBar from './src/components/BottomTabBar';
 import { TOKEN_KEY } from './src/services/api';
 
@@ -60,6 +62,8 @@ export default function App() {
         <Stack.Screen name="Friends" component={FriendsScreen} />
         <Stack.Screen name="Rooms" component={RoomsScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Onboarding" component={PlaceholderScreen} />
       </Stack.Navigator>
 
