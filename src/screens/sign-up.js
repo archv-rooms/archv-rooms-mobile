@@ -52,7 +52,7 @@ function Field({ icon, focused, children }) {
   );
 }
 
-function SuccessMessage({ onGoLogin }) {
+function SuccessMessage({ onContinue }) {
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -70,8 +70,8 @@ function SuccessMessage({ onGoLogin }) {
         <Text style={styles.successText}>
           Conta criada! Verifique seu e-mail para ativar a conta antes de entrar.
         </Text>
-        <TouchableOpacity onPress={onGoLogin}>
-          <Text style={styles.goLogin}>Go to Log In</Text>
+        <TouchableOpacity onPress={onContinue}>
+          <Text style={styles.goLogin}>Continue</Text>
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -127,6 +127,11 @@ export default function SignUpScreen({ navigation }) {
       'Date of Birth',
       'We use your date of birth to confirm you are old enough to use archv-rooms.'
     );
+  }
+
+  // After sign up, show the onboarding; it ends at the login screen
+  function goToOnboarding() {
+    navigation.navigate('Onboarding', { fromSignUp: true });
   }
 
   async function handleSignUp() {
@@ -294,7 +299,7 @@ export default function SignUpScreen({ navigation }) {
 
             {error !== '' && <Text style={styles.error}>{error}</Text>}
 
-            {success && <SuccessMessage onGoLogin={() => navigation.navigate('SignIn')} />}
+            {success && <SuccessMessage onContinue={goToOnboarding} />}
 
             <TouchableOpacity
               style={[styles.signUpButton, loading && { opacity: 0.7 }]}
