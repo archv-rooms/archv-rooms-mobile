@@ -3,8 +3,8 @@ import { Platform } from 'react-native';
 // Switch to false when the Render API is back
 export const TEST_MODE = true;
 
-// On web, use the site's own address (works on the PC and on Netlify)
-const BASE = Platform.OS === 'web' ? window.location.origin : 'http://localhost:8081';
+const SITE = 'https://archvrooms-app.netlify.app';
+const BASE = Platform.OS === 'web' ? window.location.origin : SITE;
 
 export const TEST_GAMES = [
   { id: 't0', title: 'From Below', console: 'NES', fileUrl: BASE + '/from-below.nes', image: BASE + '/from.png' },
@@ -12,7 +12,7 @@ export const TEST_GAMES = [
   { id: 't6', title: 'Spacegulls', console: 'NES', fileUrl: BASE + '/spacegulls.nes', image: BASE + '/spacegulls.png' },
   { id: 't7', title: 'Street Fighter II', console: 'NES', fileUrl: BASE + '/streetFighterII.nes', image: BASE + '/street.png' },
   { id: 't8', title: 'Mortal Kombat', console: 'SFC', fileUrl: BASE + '/kombat.sfc', image: BASE + '/mkk.png' },
-  { id: 't9', title: 'Metroid II Return of Samus', console: 'SFC', fileUrl: BASE + '/MetroidII-Return-of-Samus.gb', image: BASE + '/metroid.png' },
+  { id: 't9', title: 'Metroid II Return of Samus', console: 'GB', fileUrl: BASE + '/MetroidII-Return-of-Samus.gb', image: BASE + '/metroid.png' },
   { id: 't10', title: 'Super Mario World', console: 'SFC', fileUrl: BASE + '/Super-Mario-World.sfc', image: BASE + '/supermario.png' },
 ];
 
