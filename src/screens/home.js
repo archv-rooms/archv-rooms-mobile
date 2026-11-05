@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
   ScrollView,
   StyleSheet,
   Animated,
@@ -18,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api, { TOKEN_KEY } from '../services/api';
+import api from '../services/api';
 import { MODO_TESTE, JOGOS_TESTE } from '../services/mock';
 
 const TABS = ['Recent', 'Games', 'Saves'];
@@ -43,10 +42,6 @@ const BRANCO = '#FFFFFF';
 const TEXTO_SUAVE = '#B4AACB';
 const ROSA = '#FF6B8A';
 const ERRO = '#FF9AA8';
-
-// Medidas da barra de baixo
-const PILULA_LARGURA = 56;
-const BARRA_PAD = 8;
 
 // Cartões de exemplo, usados só se a API não responder
 const EXEMPLOS = [1, 2, 3, 4, 5, 6].map((n) => ({
@@ -283,41 +278,6 @@ function CartaoJogo({ jogo, indice, favorito, onPress, onFavorito }) {
   );
 }
 
-// Botão da barra de baixo
-function ItemBarra({ icone, iconeAtivo, texto, ativo, onPress }) {
-  const s = useRef(new Animated.Value(1)).current;
-  const primeira = useRef(true);
-
-  useEffect(() => {
-    if (primeira.current) {
-      primeira.current = false;
-      return;
-    }
-    if (ativo) {
-      s.setValue(0.7);
-      Animated.spring(s, {
-        toValue: 1,
-        useNativeDriver: NATIVO,
-        speed: 14,
-        bounciness: 18,
-      }).start();
-    }
-  }, [ativo]);
-
-  return (
-    <Toque onPress={onPress} wrapStyle={{ flex: 1 }} style={styles.barraItem} escala={0.88}>
-      <Animated.View style={[styles.barraIcone, { transform: [{ scale: s }] }]}>
-        <Ionicons
-          name={ativo ? iconeAtivo : icone}
-          size={24}
-          color={ativo ? BRANCO : TEXTO_SUAVE}
-        />
-      </Animated.View>
-      <Text style={[styles.barraTexto, ativo && styles.barraTextoAtivo]}>{texto}</Text>
-    </Toque>
-  );
-}
-
 // Tela vazia com ícone flutuando
 function EstadoVazio({ icone, texto }) {
   const flutua = useFlutuar(6, 1600);
@@ -340,7 +300,6 @@ export default function HomeScreen({ navigation }) {
   });
 
   const [activeTab, setActiveTab] = useState('Recent');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [games, setGames] = useState(EXEMPLOS);
   const [erro, setErro] = useState('');
   const [busca, setBusca] = useState('');
@@ -349,12 +308,8 @@ export default function HomeScreen({ navigation }) {
   const [recentes, setRecentes] = useState([]);
   const [atualizando, setAtualizando] = useState(false);
   const [larguraTabs, setLarguraTabs] = useState(0);
-  const [larguraBarra, setLarguraBarra] = useState(0);
 
-  const menuAnim = useRef(new Animated.Value(0)).current;
   const abaAnim = useRef(new Animated.Value(0)).current;
-  const barraAnim = useRef(new Animated.Value(0)).current;
-  const barraEntrada = useRef(new Animated.Value(0)).current;
   const foco = useRef(new Animated.Value(0)).current;
   const logoFlutua = useFlutuar(3, 2200);
 
@@ -383,16 +338,6 @@ export default function HomeScreen({ navigation }) {
       activeTab === 'Recent' && recentes.length === 0 ? 'Nenhum jogo recente' : 'Nenhum jogo encontrado';
   }
 
-  // Painel da conta abre e fecha com mola
-  useEffect(() => {
-    Animated.spring(menuAnim, {
-      toValue: menuOpen ? 1 : 0,
-      useNativeDriver: NATIVO,
-      tension: 120,
-      friction: 11,
-    }).start();
-  }, [menuOpen]);
-
   // Pílula das abas desliza
   const indiceAba = TABS.indexOf(activeTab);
   useEffect(() => {
@@ -403,29 +348,6 @@ export default function HomeScreen({ navigation }) {
       friction: 14,
     }).start();
   }, [indiceAba]);
-
-  // Pílula da barra de baixo desliza (Jogos ou Conta)
-  useEffect(() => {
-    Animated.spring(barraAnim, {
-      toValue: menuOpen ? 3 : 0,
-      useNativeDriver: NATIVO,
-      tension: 140,
-      friction: 14,
-    }).start();
-  }, [menuOpen]);
-
-  // Barra de baixo sobe ao abrir a tela
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(350),
-      Animated.spring(barraEntrada, {
-        toValue: 1,
-        useNativeDriver: NATIVO,
-        tension: 60,
-        friction: 10,
-      }),
-    ]).start();
-  }, []);
 
   // Carrega favoritos e recentes salvos no aparelho
   useEffect(() => {
@@ -495,12 +417,6 @@ export default function HomeScreen({ navigation }) {
     AsyncStorage.setItem(RECENTES_KEY, JSON.stringify(novos)).catch(() => {});
   }
 
-  function limparRecentes() {
-    setRecentes([]);
-    AsyncStorage.removeItem(RECENTES_KEY).catch(() => {});
-    setMenuOpen(false);
-  }
-
   async function abrirJogo(jogo) {
     if (jogo.exemplo) {
       setErro('Este é um cartão de exemplo. Os jogos reais aparecem quando a API voltar.');
@@ -525,25 +441,6 @@ export default function HomeScreen({ navigation }) {
     }
   }
 
-  async function handleExit() {
-    try {
-      await AsyncStorage.removeItem(TOKEN_KEY);
-    } catch (e) {
-      // se der erro ao apagar, seguimos para o login mesmo assim
-    }
-    navigation.reset({ index: 0, routes: [{ name: 'SignIn' }] });
-  }
-
-  function irParaGames() {
-    setMenuOpen(false);
-    setActiveTab('Games');
-  }
-
-  function irParaAmigos() {
-    setMenuOpen(false);
-    navigation.navigate('Friends');
-  }
-
   function focarBusca() {
     Animated.timing(foco, { toValue: 1, duration: 200, useNativeDriver: false }).start();
   }
@@ -559,20 +456,6 @@ export default function HomeScreen({ navigation }) {
     outputRange: [0, larguraAba, larguraAba * 2],
   });
 
-  const larguraItem = larguraBarra > 0 ? (larguraBarra - BARRA_PAD * 2) / 4 : 0;
-  const pilulaTranslate = barraAnim.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: [0, larguraItem, larguraItem * 2, larguraItem * 3],
-  });
-
-  const menuOpacity = menuAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-  const menuY = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
-  const menuEscala = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
-
   const buscaBorda = foco.interpolate({
     inputRange: [0, 1],
     outputRange: ['rgba(142,124,240,0)', ACENTO],
@@ -581,8 +464,6 @@ export default function HomeScreen({ navigation }) {
     inputRange: [0, 1],
     outputRange: [SUPERFICIE, SUPERFICIE_CLARA],
   });
-
-  const barraY = barraEntrada.interpolate({ inputRange: [0, 1], outputRange: [100, 0] });
 
   // espera a fonte carregar
   if (!fontesProntas) {
@@ -719,87 +600,6 @@ export default function HomeScreen({ navigation }) {
           />
         )}
       </View>
-
-      {/* Barra de baixo flutuante */}
-      <Animated.View
-        style={[styles.barra, { transform: [{ translateY: barraY }] }]}
-        onLayout={(e) => setLarguraBarra(e.nativeEvent.layout.width)}
-      >
-        <Animated.View
-          style={[
-            styles.barraPilula,
-            {
-              left: BARRA_PAD + (larguraItem - PILULA_LARGURA) / 2,
-              transform: [{ translateX: pilulaTranslate }],
-            },
-          ]}
-        />
-        <ItemBarra
-          icone="game-controller-outline"
-          iconeAtivo="game-controller"
-          texto="Jogos"
-          ativo={!menuOpen}
-          onPress={irParaGames}
-        />
-        <ItemBarra
-          icone="people-outline"
-          iconeAtivo="people"
-          texto="Amigos"
-          ativo={false}
-          onPress={irParaAmigos}
-        />
-        <ItemBarra
-          icone="albums-outline"
-          iconeAtivo="albums"
-          texto="Salas"
-          ativo={false}
-          onPress={() => setMenuOpen(false)}
-        />
-        <ItemBarra
-          icone="person-circle-outline"
-          iconeAtivo="person-circle"
-          texto="Conta"
-          ativo={menuOpen}
-          onPress={() => setMenuOpen(!menuOpen)}
-        />
-      </Animated.View>
-
-      {/* Fecha o painel ao tocar fora */}
-      {menuOpen && (
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} />
-      )}
-
-      {/* Painel da conta */}
-      <Animated.View
-        pointerEvents={menuOpen ? 'auto' : 'none'}
-        style={[
-          styles.menuWrapper,
-          {
-            opacity: menuOpacity,
-            transform: [{ translateY: menuY }, { scale: menuEscala }],
-          },
-        ]}
-      >
-        <View style={styles.menu}>
-          <Toque style={styles.menuItem} escala={0.96}>
-            <Ionicons name="settings-outline" size={20} color={BRANCO} />
-            <Text style={styles.menuText}>Ajustes</Text>
-          </Toque>
-          <Toque style={styles.menuItem} escala={0.96}>
-            <Ionicons name="information-circle-outline" size={20} color={BRANCO} />
-            <Text style={styles.menuText}>Sobre</Text>
-          </Toque>
-          <Toque style={styles.menuItem} onPress={limparRecentes} escala={0.96}>
-            <Ionicons name="time-outline" size={20} color={BRANCO} />
-            <Text style={styles.menuText}>Limpar recentes</Text>
-          </Toque>
-          <View style={styles.menuDivisor} />
-          <Toque style={styles.menuItem} onPress={handleExit} escala={0.96}>
-            <Ionicons name="log-out-outline" size={20} color={ERRO} />
-            <Text style={[styles.menuText, { color: ERRO }]}>Sair</Text>
-          </Toque>
-        </View>
-      </Animated.View>
     </LinearGradient>
   );
 }
@@ -1047,96 +847,5 @@ const styles = StyleSheet.create({
     fontFamily: TEXTO_SEMI,
     color: TEXTO_SUAVE,
     fontSize: 18,
-  },
-
-  // Barra de baixo flutuante
-  barra: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: Platform.OS === 'ios' ? 28 : 16,
-    flexDirection: 'row',
-    backgroundColor: 'rgba(36,29,60,0.98)',
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    paddingVertical: 10,
-    paddingHorizontal: BARRA_PAD,
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 12,
-  },
-  barraPilula: {
-    position: 'absolute',
-    top: 10,
-    width: PILULA_LARGURA,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: ROXO_BOTAO,
-    shadowColor: ACENTO,
-    shadowOpacity: 0.7,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
-  },
-  barraItem: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  barraIcone: {
-    width: PILULA_LARGURA,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  barraTexto: {
-    fontFamily: TEXTO_SEMI,
-    color: TEXTO_SUAVE,
-    fontSize: 13,
-  },
-  barraTextoAtivo: {
-    color: BRANCO,
-    fontFamily: TEXTO_BOLD,
-  },
-
-  // Painel da conta (aparece em cima do botão Conta)
-  menuWrapper: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 112 : 100,
-    right: 20,
-    width: 210,
-  },
-  menu: {
-    backgroundColor: SUPERFICIE_CLARA,
-    borderRadius: 20,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 10,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  menuText: {
-    fontFamily: TEXTO_SEMI,
-    color: BRANCO,
-    fontSize: 17,
-  },
-  menuDivisor: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginVertical: 4,
-    marginHorizontal: 14,
   },
 });

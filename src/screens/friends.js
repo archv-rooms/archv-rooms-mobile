@@ -16,6 +16,7 @@ import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@exp
 import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOKEN_KEY } from '../services/api';
+import { MODO_TESTE } from '../services/mock';
 import {
   listarAmigos,
   listarPendentes,
@@ -25,7 +26,6 @@ import {
 } from '../services/friends';
 
 const NATIVO = Platform.OS !== 'web';
-const TEXTO = 'Rajdhani_500Medium';
 const TEXTO_SEMI = 'Rajdhani_600SemiBold';
 const TEXTO_BOLD = 'Rajdhani_700Bold';
 
@@ -52,7 +52,6 @@ function corDoNome(nome) {
 
 // ─── Animações reutilizáveis ───
 
-// Valor que sobe e desce devagar (para flutuar)
 function useFlutuar(amplitude, duracao) {
   const v = useRef(new Animated.Value(0)).current;
 
@@ -80,7 +79,6 @@ function useFlutuar(amplitude, duracao) {
   return v.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
 }
 
-// Botão que afunda ao tocar e volta com mola
 function Toque({ onPress, wrapStyle, style, children, escala = 0.93, disabled }) {
   const s = useRef(new Animated.Value(1)).current;
 
@@ -115,7 +113,6 @@ function Toque({ onPress, wrapStyle, style, children, escala = 0.93, disabled })
   );
 }
 
-// Entra com fade e subida, com atraso opcional
 function Entrada({ atraso = 0, style, children }) {
   const v = useRef(new Animated.Value(0)).current;
 
@@ -146,7 +143,6 @@ function Entrada({ atraso = 0, style, children }) {
   );
 }
 
-// Linha da lista: entra em cascata
 function LinhaAnimada({ indice, children }) {
   const v = useRef(new Animated.Value(0)).current;
 
@@ -177,7 +173,6 @@ function LinhaAnimada({ indice, children }) {
   );
 }
 
-// Luzes roxas se movendo ao fundo
 function FundoOrbes() {
   const a = useFlutuar(26, 5200);
   const b = useFlutuar(32, 6800);
@@ -190,7 +185,6 @@ function FundoOrbes() {
   );
 }
 
-// Bolinha com a inicial do nome
 function Avatar({ nome }) {
   const cor = corDoNome(nome);
   return (
@@ -202,7 +196,6 @@ function Avatar({ nome }) {
   );
 }
 
-// Botão "Adicionar" que vira "Enviado" com pop
 function BotaoAdicionar({ enviado, onPress }) {
   const s = useRef(new Animated.Value(1)).current;
   const primeira = useRef(true);
@@ -237,7 +230,6 @@ function BotaoAdicionar({ enviado, onPress }) {
   );
 }
 
-// Tela vazia com ícone flutuando
 function EstadoVazio({ icone, texto }) {
   const flutua = useFlutuar(6, 1600);
 
@@ -253,7 +245,6 @@ function EstadoVazio({ icone, texto }) {
 
 export default function FriendsScreen({ navigation }) {
   const [fontesProntas] = useFonts({
-    Rajdhani_500Medium,
     Rajdhani_600SemiBold,
     Rajdhani_700Bold,
   });
@@ -276,7 +267,7 @@ export default function FriendsScreen({ navigation }) {
   useEffect(() => {
     async function iniciar() {
       const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (!token) {
+      if (!token && !MODO_TESTE) {
         setLogado(false);
         return;
       }
@@ -306,6 +297,10 @@ export default function FriendsScreen({ navigation }) {
   async function responderConvite(id, status) {
     try {
       await responder(id, status);
+      if (MODO_TESTE) {
+        setPendentes((lista) => lista.filter((x) => x.id !== id));
+        return;
+      }
       carregar();
     } catch (e) {}
   }
@@ -333,7 +328,6 @@ export default function FriendsScreen({ navigation }) {
 
   const buscando = busca.trim() !== '';
 
-  // espera a fonte carregar
   if (!fontesProntas) {
     return <View style={{ flex: 1, backgroundColor: FUNDO_TOPO }} />;
   }
@@ -393,7 +387,7 @@ export default function FriendsScreen({ navigation }) {
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: 40 }}
+              contentContainerStyle={{ paddingBottom: 130 }}
             >
               {/* Resultados da busca */}
               {buscando &&
