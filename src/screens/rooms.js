@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,10 +17,31 @@ const WHITE = '#FFFFFF';
 const TEXT_MUTED = '#B4AACB';
 const GREEN = '#4ADE80';
 
-export default function RoomsScreen() {
+export default function RoomsScreen({ route }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
   const [rooms, setRooms] = useState(MOCK_ROOMS);
   const [joinedIds, setJoinedIds] = useState([]);
+  const [notice, setNotice] = useState('');
+
+  const inviteName = route?.params?.invite;
+  const inviteTs = route?.params?.ts;
+
+  // Chegou um convite vindo da tela de Amigos: cria a sala e avisa
+  useEffect(() => {
+    if (!inviteName) return;
+    const room = {
+      id: 'r' + Date.now(),
+      game: 'Street Fighter II',
+      host: 'você',
+      players: 1,
+      maxPlayers: 2,
+    };
+    setRooms((list) => [room, ...list]);
+    setJoinedIds((list) => [...list, room.id]);
+    setNotice('Convite enviado para ' + inviteName);
+    const timer = setTimeout(() => setNotice(''), 3500);
+    return () => clearTimeout(timer);
+  }, [inviteName, inviteTs]);
 
   function createRoom() {
     const room = {
@@ -51,6 +72,13 @@ export default function RoomsScreen() {
             <Text style={styles.createText}>Criar sala</Text>
           </Pressable>
         </View>
+
+        {notice !== '' && (
+          <View style={styles.notice}>
+            <Ionicons name="checkmark-circle" size={20} color={GREEN} />
+            <Text style={styles.noticeText}>{notice}</Text>
+          </View>
+        )}
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
           {rooms.map((room) => {
@@ -111,6 +139,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   createText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(74,222,128,0.14)',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  noticeText: { fontFamily: FONT_BOLD, color: GREEN, fontSize: 16 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

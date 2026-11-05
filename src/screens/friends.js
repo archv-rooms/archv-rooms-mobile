@@ -309,6 +309,11 @@ export default function FriendsScreen({ navigation }) {
     return u.username || u.name || 'User';
   }
 
+  // Convida o amigo para uma sala: abre a tela de Salas já criando a sala
+  function convidarParaSala(amigo) {
+    navigation.navigate('Rooms', { invite: nomeDe(amigo), ts: Date.now() });
+  }
+
   function focarBusca() {
     Animated.timing(foco, { toValue: 1, duration: 200, useNativeDriver: false }).start();
   }
@@ -471,6 +476,14 @@ export default function FriendsScreen({ navigation }) {
                         <Text style={styles.nome} numberOfLines={1}>
                           {nomeDe(a)}
                         </Text>
+                        <Toque
+                          onPress={() => convidarParaSala(a)}
+                          style={styles.botaoConvidar}
+                          escala={0.88}
+                        >
+                          <Ionicons name="game-controller" size={16} color={BRANCO} />
+                          <Text style={styles.botaoTexto}>Convidar</Text>
+                        </Toque>
                         <View style={styles.chatIcone}>
                           <Ionicons name="chatbubble" size={16} color={BRANCO} />
                         </View>
@@ -649,6 +662,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 8,
+  },
+  botaoConvidar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: SUPERFICIE_CLARA,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
   },
   botaoEnviado: {
     backgroundColor: 'rgba(74,222,128,0.14)',
