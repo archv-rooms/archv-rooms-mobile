@@ -1,12 +1,12 @@
 import { Platform } from 'react-native';
 
-// Troque para false quando a API do Render voltar
-export const MODO_TESTE = true;
+// Switch to false when the Render API is back
+export const TEST_MODE = true;
 
-// Na web usa o endereço do próprio site (funciona no PC e no Netlify)
+// On web, use the site's own address (works on the PC and on Netlify)
 const BASE = Platform.OS === 'web' ? window.location.origin : 'http://localhost:8081';
 
-export const JOGOS_TESTE = [
+export const TEST_GAMES = [
   { id: 't0', title: 'From Below', console: 'NES', fileUrl: BASE + '/from-below.nes', image: BASE + '/from.png' },
   { id: 't5', title: 'Böbl', console: 'NES', fileUrl: BASE + '/bobl.nes', image: BASE + '/bolb.png' },
   { id: 't6', title: 'Spacegulls', console: 'NES', fileUrl: BASE + '/spacegulls.nes', image: BASE + '/spacegulls.png' },
@@ -16,13 +16,13 @@ export const JOGOS_TESTE = [
   { id: 't10', title: 'Super Mario World', console: 'SFC', fileUrl: BASE + '/Super-Mario-World.sfc', image: BASE + '/supermario.png' },
 ];
 
-export const AMIGOS_TESTE = [
+export const TEST_FRIENDS = [
   { id: 'u1', name: 'Lucas', username: 'lucas', status: 'playing', game: 'Super Mario World' },
   { id: 'u2', name: 'Ana', username: 'ana', status: 'online', game: null },
   { id: 'u3', name: 'Pedro', username: 'pedro', status: 'offline', game: null },
 ];
 
-export const PENDENTES_TESTE = [
+export const TEST_PENDING = [
   { id: 'f10', name: 'Marina', username: 'marina' },
   { id: 'f11', name: 'Caio', username: 'caio' },
 ];

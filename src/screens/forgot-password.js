@@ -21,7 +21,7 @@ import {
   Rajdhani_700Bold,
 } from '@expo-google-fonts/rajdhani';
 import api from '../services/api';
-import { MODO_TESTE } from '../services/mock';
+import { TEST_MODE } from '../services/mock';
 
 const NATIVE = Platform.OS !== 'web';
 
@@ -115,7 +115,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     setLoading(true);
 
     // Test mode: pretends the link was sent, without calling the API
-    if (MODO_TESTE) {
+    if (TEST_MODE) {
       await new Promise((resolve) => setTimeout(resolve, 600));
       setLoading(false);
       setSent(true);

@@ -12,65 +12,66 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  conectar,
-  desconectar,
-  entrarNaConversa,
-  sairDaConversa,
-  abrirConversa,
-  buscarMensagens,
-  enviarMensagem,
+  conectar as connect,
+  desconectar as disconnect,
+  entrarNaConversa as joinConversation,
+  sairDaConversa as leaveConversation,
+  abrirConversa as openConversation,
+  buscarMensagens as fetchMessages,
+  enviarMensagem as sendMessage,
 } from '../services/chat';
 
-const ROXO = '#6A5BD6';
-const SUPERFICIE = '#4B4163';
-const SUAVE = '#B8B0C8';
+const PURPLE = '#6A5BD6';
+const SURFACE = '#4B4163';
+const MUTED = '#B8B0C8';
 
 export default function ChatScreen({ navigation, route }) {
   const { friend } = route.params;
-  const [mensagens, setMensagens] = useState([]);
-  const [texto, setTexto] = useState('');
-  const conversaId = useRef(null);
-  const lista = useRef(null);
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState('');
+  const conversationId = useRef(null);
+  const listRef = useRef(null);
 
   useEffect(() => {
-    async function iniciar() {
+    async function start() {
       try {
-        const conversa = await abrirConversa(friend.id);
-        conversaId.current = conversa.id;
+        const conversation = await openConversation(friend.id);
+        conversationId.current = conversation.id;
 
-        conectar((msg) => {
-          if (msg.conversationId !== conversaId.current) return;
-          setMensagens((atuais) =>
-            atuais.some((m) => m.id === msg.id) ? atuais : [...atuais, msg]
+        // New messages arrive here; ignore duplicates and other conversations
+        connect((message) => {
+          if (message.conversationId !== conversationId.current) return;
+          setMessages((current) =>
+            current.some((m) => m.id === message.id) ? current : [...current, message]
           );
         });
-        entrarNaConversa(conversa.id);
+        joinConversation(conversation.id);
 
-        setMensagens(await buscarMensagens(conversa.id));
+        setMessages(await fetchMessages(conversation.id));
       } catch (e) {}
     }
-    iniciar();
+    start();
 
     return () => {
-      if (conversaId.current) sairDaConversa(conversaId.current);
-      desconectar();
+      if (conversationId.current) leaveConversation(conversationId.current);
+      disconnect();
     };
   }, []);
 
-  async function enviar() {
-    const conteudo = texto.trim();
-    if (!conteudo || !conversaId.current) return;
-    setTexto('');
+  async function send() {
+    const content = text.trim();
+    if (!content || !conversationId.current) return;
+    setText('');
     try {
-      await enviarMensagem(conversaId.current, conteudo);
+      await sendMessage(conversationId.current, content);
     } catch (e) {}
   }
 
-  function renderMensagem({ item }) {
-    const minha = item.senderId !== friend.id;
+  function renderMessage({ item }) {
+    const isMine = item.senderId !== friend.id;
     return (
-      <View style={[styles.balao, minha ? styles.minha : styles.deles]}>
-        <Text style={styles.balaoTexto}>{item.content}</Text>
+      <View style={[styles.bubble, isMine ? styles.mine : styles.theirs]}>
+        <Text style={styles.bubbleText}>{item.content}</Text>
       </View>
     );
   }
@@ -81,32 +82,32 @@ export default function ChatScreen({ navigation, route }) {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.topo}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.voltar}>
+        <View style={styles.top}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
             <Ionicons name="arrow-back" size={22} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.titulo}>{friend.username || friend.name}</Text>
+          <Text style={styles.title}>{friend.username || friend.name}</Text>
         </View>
 
         <FlatList
-          ref={lista}
-          data={mensagens}
+          ref={listRef}
+          data={messages}
           keyExtractor={(m) => String(m.id)}
-          renderItem={renderMensagem}
-          onContentSizeChange={() => lista.current?.scrollToEnd({ animated: true })}
+          renderItem={renderMessage}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
           showsVerticalScrollIndicator={false}
         />
 
-        <View style={styles.entrada}>
+        <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
             placeholder="Message"
-            placeholderTextColor={SUAVE}
-            value={texto}
-            onChangeText={setTexto}
-            onSubmitEditing={enviar}
+            placeholderTextColor={MUTED}
+            value={text}
+            onChangeText={setText}
+            onSubmitEditing={send}
           />
-          <TouchableOpacity style={styles.enviar} onPress={enviar}>
+          <TouchableOpacity style={styles.sendButton} onPress={send}>
             <Ionicons name="send" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -117,8 +118,8 @@ export default function ChatScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16 },
-  topo: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
-  voltar: {
+  top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  back: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -126,32 +127,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titulo: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
-  balao: {
+  title: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
+  bubble: {
     maxWidth: '78%',
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 9,
     marginBottom: 8,
   },
-  minha: { alignSelf: 'flex-end', backgroundColor: ROXO },
-  deles: { alignSelf: 'flex-start', backgroundColor: SUPERFICIE },
-  balaoTexto: { color: '#fff', fontSize: 16 },
-  entrada: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  mine: { alignSelf: 'flex-end', backgroundColor: PURPLE },
+  theirs: { alignSelf: 'flex-start', backgroundColor: SURFACE },
+  bubbleText: { color: '#fff', fontSize: 16 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
   input: {
     flex: 1,
     height: 48,
-    backgroundColor: SUPERFICIE,
+    backgroundColor: SURFACE,
     borderRadius: 24,
     paddingHorizontal: 18,
     color: '#fff',
     fontSize: 16,
   },
-  enviar: {
+  sendButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: ROXO,
+    backgroundColor: PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
   },

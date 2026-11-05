@@ -12,64 +12,62 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
+import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOKEN_KEY } from '../services/api';
-import { MODO_TESTE } from '../services/mock';
+import { TEST_MODE } from '../services/mock';
 import { vibrate } from '../services/settings';
 import {
-  listarAmigos,
-  listarPendentes,
-  buscarUsuarios,
-  convidar,
-  responder,
+  listFriends,
+  listPending,
+  searchUsers,
+  sendFriendRequest,
+  respondToRequest,
 } from '../services/friends';
 
-const NATIVO = Platform.OS !== 'web';
-const TEXTO_SEMI = 'Rajdhani_600SemiBold';
-const TEXTO_BOLD = 'Rajdhani_700Bold';
+const NATIVE = Platform.OS !== 'web';
+const FONT_SEMI = 'Rajdhani_600SemiBold';
+const FONT_BOLD = 'Rajdhani_700Bold';
 
-// Cores (as mesmas da home)
-const FUNDO_TOPO = '#14111F';
-const FUNDO_BASE = '#221B38';
-const SUPERFICIE = '#2D2545';
-const SUPERFICIE_CLARA = '#3A3058';
-const ACENTO = '#8E7CF0';
-const ROXO_BOTAO = '#6A5BD6';
-const BRANCO = '#FFFFFF';
-const TEXTO_SUAVE = '#B4AACB';
-const VERDE = '#4ADE80';
-const ERRO = '#FF9AA8';
+const BG_TOP = '#14111F';
+const BG_BOTTOM = '#221B38';
+const SURFACE = '#2D2545';
+const SURFACE_LIGHT = '#3A3058';
+const ACCENT = '#8E7CF0';
+const BUTTON_PURPLE = '#6A5BD6';
+const WHITE = '#FFFFFF';
+const TEXT_MUTED = '#B4AACB';
+const GREEN = '#4ADE80';
+const ERROR = '#FF9AA8';
 
-// Cores dos avatares
-const CORES_AVATAR = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#C77CFF', '#FF4D4D'];
+const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#C77CFF', '#FF4D4D'];
 
-function corDoNome(nome) {
-  let soma = 0;
-  for (let i = 0; i < nome.length; i++) soma += nome.charCodeAt(i);
-  return CORES_AVATAR[soma % CORES_AVATAR.length];
+// Same name always gets the same color
+function colorFor(name) {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 }
 
-// ─── Animações reutilizáveis ───
-
-function useFlutuar(amplitude, duracao) {
-  const v = useRef(new Animated.Value(0)).current;
+// Value that slowly goes up and down
+function useFloat(amplitude, duration) {
+  const value = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(v, {
+        Animated.timing(value, {
           toValue: 1,
-          duration: duracao,
+          duration,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVO,
+          useNativeDriver: NATIVE,
         }),
-        Animated.timing(v, {
+        Animated.timing(value, {
           toValue: 0,
-          duration: duracao,
+          duration,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVO,
+          useNativeDriver: NATIVE,
         }),
       ])
     );
@@ -77,55 +75,42 @@ function useFlutuar(amplitude, duracao) {
     return () => loop.stop();
   }, []);
 
-  return v.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
+  return value.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
 }
 
-function Toque({ onPress, wrapStyle, style, children, escala = 0.93, disabled }) {
-  const s = useRef(new Animated.Value(1)).current;
+// Button that shrinks when pressed and springs back
+function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93, disabled }) {
+  const value = useRef(new Animated.Value(1)).current;
 
-  function dentro() {
-    Animated.spring(s, {
-      toValue: escala,
-      useNativeDriver: NATIVO,
-      speed: 50,
-      bounciness: 0,
-    }).start();
+  function pressIn() {
+    Animated.spring(value, { toValue: scale, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start();
   }
 
-  function fora() {
-    Animated.spring(s, {
-      toValue: 1,
-      useNativeDriver: NATIVO,
-      speed: 18,
-      bounciness: 14,
-    }).start();
+  function pressOut() {
+    Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 18, bounciness: 14 }).start();
   }
 
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={dentro}
-      onPressOut={fora}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
       disabled={disabled}
       style={wrapStyle}
     >
-      <Animated.View style={[style, { transform: [{ scale: s }] }]}>{children}</Animated.View>
+      <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
     </Pressable>
   );
 }
 
-function Entrada({ atraso = 0, style, children }) {
-  const v = useRef(new Animated.Value(0)).current;
+// Fades in and slides up, with an optional delay
+function FadeIn({ delay = 0, style, children }) {
+  const value = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
-      Animated.delay(atraso),
-      Animated.spring(v, {
-        toValue: 1,
-        useNativeDriver: NATIVO,
-        tension: 70,
-        friction: 10,
-      }),
+      Animated.delay(delay),
+      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 70, friction: 10 }),
     ]).start();
   }, []);
 
@@ -134,8 +119,8 @@ function Entrada({ atraso = 0, style, children }) {
       style={[
         style,
         {
-          opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
-          transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
+          opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+          transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
         },
       ]}
     >
@@ -144,28 +129,24 @@ function Entrada({ atraso = 0, style, children }) {
   );
 }
 
-function LinhaAnimada({ indice, children }) {
-  const v = useRef(new Animated.Value(0)).current;
+// List row that pops in one after another
+function AnimatedRow({ index, children }) {
+  const value = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.sequence([
-      Animated.delay(Math.min(indice, 8) * 60),
-      Animated.spring(v, {
-        toValue: 1,
-        useNativeDriver: NATIVO,
-        tension: 60,
-        friction: 9,
-      }),
+      Animated.delay(Math.min(index, 8) * 60),
+      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 60, friction: 9 }),
     ]).start();
   }, []);
 
   return (
     <Animated.View
       style={{
-        opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+        opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
         transform: [
-          { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
-          { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
+          { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
+          { scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
         ],
       }}
     >
@@ -174,325 +155,298 @@ function LinhaAnimada({ indice, children }) {
   );
 }
 
-function FundoOrbes() {
-  const a = useFlutuar(26, 5200);
-  const b = useFlutuar(32, 6800);
+function BackgroundOrbs() {
+  const a = useFloat(26, 5200);
+  const b = useFloat(32, 6800);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Animated.View style={[styles.orbe1, { transform: [{ translateY: a }, { translateX: b }] }]} />
-      <Animated.View style={[styles.orbe2, { transform: [{ translateY: b }, { translateX: a }] }]} />
+      <Animated.View style={[styles.orb1, { transform: [{ translateY: a }, { translateX: b }] }]} />
+      <Animated.View style={[styles.orb2, { transform: [{ translateY: b }, { translateX: a }] }]} />
     </View>
   );
 }
 
-function Avatar({ nome }) {
-  const cor = corDoNome(nome);
+function Avatar({ name }) {
+  const color = colorFor(name);
   return (
-    <View style={[styles.avatar, { backgroundColor: cor + '30', borderColor: cor + '66' }]}>
-      <Text style={[styles.avatarTexto, { color: cor }]}>
-        {(nome || '?').trim().charAt(0).toUpperCase()}
-      </Text>
+    <View style={[styles.avatar, { backgroundColor: color + '30', borderColor: color + '66' }]}>
+      <Text style={[styles.avatarText, { color }]}>{(name || '?').trim().charAt(0).toUpperCase()}</Text>
     </View>
   );
 }
 
-function BotaoAdicionar({ enviado, onPress }) {
-  const s = useRef(new Animated.Value(1)).current;
-  const primeira = useRef(true);
+function AddButton({ sent, onPress }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
-    if (primeira.current) {
-      primeira.current = false;
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
       return;
     }
-    if (enviado) {
-      s.setValue(0.7);
-      Animated.spring(s, {
-        toValue: 1,
-        useNativeDriver: NATIVO,
-        speed: 14,
-        bounciness: 20,
-      }).start();
+    if (sent) {
+      scale.setValue(0.7);
+      Animated.spring(scale, { toValue: 1, useNativeDriver: NATIVE, speed: 14, bounciness: 20 }).start();
     }
-  }, [enviado]);
+  }, [sent]);
 
   return (
-    <Toque onPress={onPress} disabled={enviado} escala={0.88}>
-      <Animated.View
-        style={[styles.botao, enviado && styles.botaoEnviado, { transform: [{ scale: s }] }]}
-      >
-        {enviado && <Ionicons name="checkmark" size={16} color={VERDE} />}
-        <Text style={[styles.botaoTexto, enviado && { color: VERDE }]}>
-          {enviado ? 'Enviado' : 'Adicionar'}
-        </Text>
+    <PressableScale onPress={onPress} disabled={sent} scale={0.88}>
+      <Animated.View style={[styles.button, sent && styles.buttonSent, { transform: [{ scale }] }]}>
+        {sent && <Ionicons name="checkmark" size={16} color={GREEN} />}
+        <Text style={[styles.buttonText, sent && { color: GREEN }]}>{sent ? 'Enviado' : 'Adicionar'}</Text>
       </Animated.View>
-    </Toque>
+    </PressableScale>
   );
 }
 
-function EstadoVazio({ icone, texto }) {
-  const flutua = useFlutuar(6, 1600);
+function EmptyState({ icon, text }) {
+  const float = useFloat(6, 1600);
 
   return (
-    <Entrada style={styles.vazio}>
-      <Animated.View style={[styles.vazioIcone, { transform: [{ translateY: flutua }] }]}>
-        <Ionicons name={icone} size={34} color={TEXTO_SUAVE} />
+    <FadeIn style={styles.empty}>
+      <Animated.View style={[styles.emptyIcon, { transform: [{ translateY: float }] }]}>
+        <Ionicons name={icon} size={34} color={TEXT_MUTED} />
       </Animated.View>
-      <Text style={styles.vazioTexto}>{texto}</Text>
-    </Entrada>
+      <Text style={styles.emptyText}>{text}</Text>
+    </FadeIn>
   );
 }
 
 export default function FriendsScreen({ navigation }) {
-  const [fontesProntas] = useFonts({
-    Rajdhani_600SemiBold,
-    Rajdhani_700Bold,
-  });
+  const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
 
-  const [logado, setLogado] = useState(true);
-  const [amigos, setAmigos] = useState([]);
-  const [pendentes, setPendentes] = useState([]);
-  const [busca, setBusca] = useState('');
-  const [resultados, setResultados] = useState([]);
+  const [loggedIn, setLoggedIn] = useState(true);
+  const [friends, setFriends] = useState([]);
+  const [pending, setPending] = useState([]);
+  const [search, setSearch] = useState('');
+  const [results, setResults] = useState([]);
 
-  const foco = useRef(new Animated.Value(0)).current;
+  const focusAnim = useRef(new Animated.Value(0)).current;
 
-  async function carregar() {
+  async function load() {
     try {
-      setAmigos(await listarAmigos());
-      setPendentes(await listarPendentes());
+      setFriends(await listFriends());
+      setPending(await listPending());
     } catch (e) {}
   }
 
   useEffect(() => {
-    async function iniciar() {
+    async function start() {
       const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (!token && !MODO_TESTE) {
-        setLogado(false);
+      if (!token && !TEST_MODE) {
+        setLoggedIn(false);
         return;
       }
-      carregar();
+      load();
     }
-    iniciar();
+    start();
   }, []);
 
-  async function pesquisar(texto) {
-    setBusca(texto);
-    if (!texto.trim()) {
-      setResultados([]);
+  async function handleSearch(text) {
+    setSearch(text);
+    if (!text.trim()) {
+      setResults([]);
       return;
     }
     try {
-      setResultados(await buscarUsuarios(texto));
+      setResults(await searchUsers(text));
     } catch (e) {}
   }
 
-  async function enviarConvite(id) {
+  async function sendRequest(id) {
     vibrate(30);
     try {
-      await convidar(id);
-      setResultados(resultados.map((u) => (u.id === id ? { ...u, requestSent: true } : u)));
+      await sendFriendRequest(id);
+      setResults(results.map((u) => (u.id === id ? { ...u, requestSent: true } : u)));
     } catch (e) {}
   }
 
-  async function responderConvite(id, status) {
+  async function answerRequest(id, status) {
     vibrate(30);
     try {
-      await responder(id, status);
-      if (MODO_TESTE) {
-        setPendentes((lista) => lista.filter((x) => x.id !== id));
+      await respondToRequest(id, status);
+      if (TEST_MODE) {
+        setPending((list) => list.filter((item) => item.id !== id));
         return;
       }
-      carregar();
+      load();
     } catch (e) {}
   }
 
-  function nomeDe(u) {
-    return u.username || u.name || 'User';
+  function displayName(user) {
+    return user.username || user.name || 'User';
   }
 
-  // Convida o amigo para uma sala: abre a tela de Salas já criando a sala
-  function convidarParaSala(amigo) {
+  // Opens Rooms and creates a room for this friend
+  function inviteToRoom(friend) {
     vibrate(30);
-    navigation.navigate('Rooms', { invite: nomeDe(amigo), ts: Date.now() });
+    navigation.navigate('Rooms', { invite: displayName(friend), ts: Date.now() });
   }
 
-  function focarBusca() {
-    Animated.timing(foco, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+  function focusSearch() {
+    Animated.timing(focusAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start();
   }
 
-  function desfocarBusca() {
-    Animated.timing(foco, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+  function blurSearch() {
+    Animated.timing(focusAnim, { toValue: 0, duration: 200, useNativeDriver: false }).start();
   }
 
-  const buscaBorda = foco.interpolate({
+  const searchBorder = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(142,124,240,0)', ACENTO],
+    outputRange: ['rgba(142,124,240,0)', ACCENT],
   });
-  const buscaFundo = foco.interpolate({
+  const searchBackground = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [SUPERFICIE, SUPERFICIE_CLARA],
+    outputRange: [SURFACE, SURFACE_LIGHT],
   });
 
-  const buscando = busca.trim() !== '';
+  const searching = search.trim() !== '';
 
-  if (!fontesProntas) {
-    return <View style={{ flex: 1, backgroundColor: FUNDO_TOPO }} />;
-  }
+  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
 
   return (
-    <LinearGradient colors={[FUNDO_TOPO, FUNDO_BASE]} style={{ flex: 1 }}>
-      <FundoOrbes />
+    <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
+      <BackgroundOrbs />
 
       <View style={styles.container}>
-        {/* Cabeçalho */}
-        <Entrada style={styles.topo}>
-          <Toque onPress={() => navigation.goBack()} style={styles.voltar} escala={0.82}>
-            <Ionicons name="arrow-back" size={22} color={BRANCO} />
-          </Toque>
+        <FadeIn style={styles.top}>
+          <PressableScale onPress={() => navigation.goBack()} style={styles.back} scale={0.82}>
+            <Ionicons name="arrow-back" size={22} color={WHITE} />
+          </PressableScale>
           <View style={{ flex: 1 }}>
-            <Text style={styles.titulo}>Amigos</Text>
-            {logado && (
-              <Text style={styles.subtitulo}>
-                {amigos.length} {amigos.length === 1 ? 'amigo' : 'amigos'}
-                {pendentes.length > 0 ? '  •  ' + pendentes.length + ' pedido(s)' : ''}
+            <Text style={styles.title}>Amigos</Text>
+            {loggedIn && (
+              <Text style={styles.subtitle}>
+                {friends.length} {friends.length === 1 ? 'amigo' : 'amigos'}
+                {pending.length > 0 ? '  •  ' + pending.length + ' pedido(s)' : ''}
               </Text>
             )}
           </View>
-        </Entrada>
+        </FadeIn>
 
-        {!logado ? (
-          <EstadoVazio
-            icone="lock-closed-outline"
-            texto="Entre na sua conta para ver seus amigos"
-          />
+        {!loggedIn ? (
+          <EmptyState icon="lock-closed-outline" text="Entre na sua conta para ver seus amigos" />
         ) : (
           <>
-            {/* Busca */}
-            <Entrada atraso={100}>
+            <FadeIn delay={100}>
               <Animated.View
-                style={[styles.busca, { borderColor: buscaBorda, backgroundColor: buscaFundo }]}
+                style={[styles.search, { borderColor: searchBorder, backgroundColor: searchBackground }]}
               >
-                <Ionicons name="search" size={20} color={TEXTO_SUAVE} />
+                <Ionicons name="search" size={20} color={TEXT_MUTED} />
                 <TextInput
-                  style={styles.buscaInput}
+                  style={styles.searchInput}
                   placeholder="Buscar usuários"
-                  placeholderTextColor={TEXTO_SUAVE}
-                  value={busca}
-                  onChangeText={pesquisar}
-                  onFocus={focarBusca}
-                  onBlur={desfocarBusca}
+                  placeholderTextColor={TEXT_MUTED}
+                  value={search}
+                  onChangeText={handleSearch}
+                  onFocus={focusSearch}
+                  onBlur={blurSearch}
                   autoCapitalize="none"
                 />
-                {busca !== '' && (
-                  <Toque onPress={() => pesquisar('')} escala={0.8}>
-                    <Ionicons name="close-circle" size={20} color={TEXTO_SUAVE} />
-                  </Toque>
+                {search !== '' && (
+                  <PressableScale onPress={() => handleSearch('')} scale={0.8}>
+                    <Ionicons name="close-circle" size={20} color={TEXT_MUTED} />
+                  </PressableScale>
                 )}
               </Animated.View>
-            </Entrada>
+            </FadeIn>
 
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingBottom: 130 }}
             >
-              {/* Resultados da busca */}
-              {buscando &&
-                resultados.map((u, i) => (
-                  <LinhaAnimada key={'busca-' + u.id} indice={i}>
-                    <View style={styles.linha}>
-                      <Avatar nome={nomeDe(u)} />
-                      <Text style={styles.nome} numberOfLines={1}>
-                        {nomeDe(u)}
+              {searching &&
+                results.map((user, i) => (
+                  <AnimatedRow key={'search-' + user.id} index={i}>
+                    <View style={styles.row}>
+                      <Avatar name={displayName(user)} />
+                      <Text style={styles.name} numberOfLines={1}>
+                        {displayName(user)}
                       </Text>
-                      <BotaoAdicionar
-                        enviado={!!u.requestSent}
-                        onPress={() => enviarConvite(u.id)}
-                      />
+                      <AddButton sent={!!user.requestSent} onPress={() => sendRequest(user.id)} />
                     </View>
-                  </LinhaAnimada>
+                  </AnimatedRow>
                 ))}
 
-              {buscando && resultados.length === 0 && (
-                <EstadoVazio key="sem-resultado" icone="person-outline" texto="Nenhum usuário encontrado" />
+              {searching && results.length === 0 && (
+                <EmptyState key="no-results" icon="person-outline" text="Nenhum usuário encontrado" />
               )}
 
-              {/* Pedidos */}
-              {!buscando && pendentes.length > 0 && (
+              {!searching && pending.length > 0 && (
                 <>
-                  <View style={styles.secaoCabecalho}>
-                    <Text style={styles.secao}>Pedidos</Text>
-                    <View style={styles.selo}>
-                      <Text style={styles.seloTexto}>{pendentes.length}</Text>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.section}>Pedidos</Text>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{pending.length}</Text>
                     </View>
                   </View>
-                  {pendentes.map((p, i) => {
-                    const nome = nomeDe(p.sender || p.user || p);
+                  {pending.map((request, i) => {
+                    const name = displayName(request.sender || request.user || request);
                     return (
-                      <LinhaAnimada key={'pedido-' + p.id} indice={i}>
-                        <View style={styles.linha}>
-                          <Avatar nome={nome} />
-                          <Text style={styles.nome} numberOfLines={1}>
-                            {nome}
+                      <AnimatedRow key={'request-' + request.id} index={i}>
+                        <View style={styles.row}>
+                          <Avatar name={name} />
+                          <Text style={styles.name} numberOfLines={1}>
+                            {name}
                           </Text>
                           <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <Toque
-                              onPress={() => responderConvite(p.id, 'accepted')}
-                              style={[styles.botaoIcone, { backgroundColor: ROXO_BOTAO }]}
-                              escala={0.8}
+                            <PressableScale
+                              onPress={() => answerRequest(request.id, 'accepted')}
+                              style={[styles.iconButton, { backgroundColor: BUTTON_PURPLE }]}
+                              scale={0.8}
                             >
-                              <Ionicons name="checkmark" size={20} color={BRANCO} />
-                            </Toque>
-                            <Toque
-                              onPress={() => responderConvite(p.id, 'rejected')}
-                              style={[styles.botaoIcone, { backgroundColor: SUPERFICIE_CLARA }]}
-                              escala={0.8}
+                              <Ionicons name="checkmark" size={20} color={WHITE} />
+                            </PressableScale>
+                            <PressableScale
+                              onPress={() => answerRequest(request.id, 'rejected')}
+                              style={[styles.iconButton, { backgroundColor: SURFACE_LIGHT }]}
+                              scale={0.8}
                             >
-                              <Ionicons name="close" size={20} color={ERRO} />
-                            </Toque>
+                              <Ionicons name="close" size={20} color={ERROR} />
+                            </PressableScale>
                           </View>
                         </View>
-                      </LinhaAnimada>
+                      </AnimatedRow>
                     );
                   })}
                 </>
               )}
 
-              {/* Amigos */}
-              {!buscando && (
+              {!searching && (
                 <>
-                  <View style={styles.secaoCabecalho}>
-                    <Text style={styles.secao}>Amigos</Text>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.section}>Amigos</Text>
                   </View>
-                  {amigos.length === 0 && (
-                    <EstadoVazio key="sem-amigos" icone="people-outline" texto="Nenhum amigo ainda" />
+                  {friends.length === 0 && (
+                    <EmptyState key="no-friends" icon="people-outline" text="Nenhum amigo ainda" />
                   )}
-                  {amigos.map((a, i) => (
-                    <LinhaAnimada key={'amigo-' + a.id} indice={i}>
-                      <Toque
-                        style={styles.linha}
-                        onPress={() => navigation.navigate('Chat', { friend: a })}
-                        escala={0.96}
+                  {friends.map((friend, i) => (
+                    <AnimatedRow key={'friend-' + friend.id} index={i}>
+                      <PressableScale
+                        style={styles.row}
+                        onPress={() => navigation.navigate('Chat', { friend })}
+                        scale={0.96}
                       >
-                        <Avatar nome={nomeDe(a)} />
-                        <Text style={styles.nome} numberOfLines={1}>
-                          {nomeDe(a)}
+                        <Avatar name={displayName(friend)} />
+                        <Text style={styles.name} numberOfLines={1}>
+                          {displayName(friend)}
                         </Text>
-                        <Toque
-                          onPress={() => convidarParaSala(a)}
-                          style={styles.botaoConvidar}
-                          escala={0.88}
+                        <PressableScale
+                          onPress={() => inviteToRoom(friend)}
+                          style={styles.inviteButton}
+                          scale={0.88}
                         >
-                          <Ionicons name="game-controller" size={16} color={BRANCO} />
-                          <Text style={styles.botaoTexto}>Convidar</Text>
-                        </Toque>
-                        <View style={styles.chatIcone}>
-                          <Ionicons name="chatbubble" size={16} color={BRANCO} />
+                          <Ionicons name="game-controller" size={16} color={WHITE} />
+                          <Text style={styles.buttonText}>Convidar</Text>
+                        </PressableScale>
+                        <View style={styles.chatIcon}>
+                          <Ionicons name="chatbubble" size={16} color={WHITE} />
                         </View>
-                      </Toque>
-                    </LinhaAnimada>
+                      </PressableScale>
+                    </AnimatedRow>
                   ))}
                 </>
               )}
@@ -511,8 +465,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
   },
 
-  // Luzes de fundo
-  orbe1: {
+  orb1: {
     position: 'absolute',
     top: -60,
     right: -80,
@@ -521,7 +474,7 @@ const styles = StyleSheet.create({
     borderRadius: 130,
     backgroundColor: 'rgba(142,124,240,0.14)',
   },
-  orbe2: {
+  orb2: {
     position: 'absolute',
     bottom: 80,
     left: -100,
@@ -531,14 +484,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(106,91,214,0.12)',
   },
 
-  // Cabeçalho
-  topo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 18,
-  },
-  voltar: {
+  top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 },
+  back: {
     width: 42,
     height: 42,
     borderRadius: 21,
@@ -546,21 +493,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  titulo: {
-    fontFamily: TEXTO_BOLD,
-    color: BRANCO,
-    fontSize: 28,
-    letterSpacing: 0.5,
-  },
-  subtitulo: {
-    fontFamily: TEXTO_SEMI,
-    color: TEXTO_SUAVE,
-    fontSize: 14,
-    marginTop: -2,
-  },
+  title: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 28, letterSpacing: 0.5 },
+  subtitle: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: -2 },
 
-  // Busca
-  busca: {
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -569,55 +505,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 50,
   },
-  buscaInput: {
-    flex: 1,
-    height: '100%',
-    color: BRANCO,
-    fontFamily: TEXTO_SEMI,
-    fontSize: 18,
-  },
+  searchInput: { flex: 1, height: '100%', color: WHITE, fontFamily: FONT_SEMI, fontSize: 18 },
 
-  // Seções
-  secaoCabecalho: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 22,
-    marginBottom: 10,
-  },
-  secao: {
-    fontFamily: TEXTO_BOLD,
-    color: TEXTO_SUAVE,
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22, marginBottom: 10 },
+  section: {
+    fontFamily: FONT_BOLD,
+    color: TEXT_MUTED,
     fontSize: 16,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
-  selo: {
+  badge: {
     minWidth: 22,
     height: 22,
     borderRadius: 11,
     paddingHorizontal: 6,
-    backgroundColor: ROXO_BOTAO,
+    backgroundColor: BUTTON_PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACENTO,
+    shadowColor: ACCENT,
     shadowOpacity: 0.7,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
     elevation: 4,
   },
-  seloTexto: {
-    fontFamily: TEXTO_BOLD,
-    color: BRANCO,
-    fontSize: 13,
-  },
+  badgeText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 13 },
 
-  // Linhas
-  linha: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: SUPERFICIE,
+    backgroundColor: SURFACE,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.06)',
@@ -633,58 +551,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarTexto: {
-    fontFamily: TEXTO_BOLD,
-    fontSize: 20,
-  },
-  nome: {
-    flex: 1,
-    fontFamily: TEXTO_BOLD,
-    color: BRANCO,
-    fontSize: 18,
-  },
-  chatIcone: {
+  avatarText: { fontFamily: FONT_BOLD, fontSize: 20 },
+  name: { flex: 1, fontFamily: FONT_BOLD, color: WHITE, fontSize: 18 },
+  chatIcon: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: ROXO_BOTAO,
+    backgroundColor: BUTTON_PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACENTO,
+    shadowColor: ACCENT,
     shadowOpacity: 0.6,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
     elevation: 3,
   },
 
-  // Botões
-  botao: {
+  button: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: ROXO_BOTAO,
+    backgroundColor: BUTTON_PURPLE,
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  botaoConvidar: {
+  inviteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: SUPERFICIE_CLARA,
+    backgroundColor: SURFACE_LIGHT,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
-  botaoEnviado: {
-    backgroundColor: 'rgba(74,222,128,0.14)',
-  },
-  botaoTexto: {
-    fontFamily: TEXTO_BOLD,
-    color: BRANCO,
-    fontSize: 15,
-  },
-  botaoIcone: {
+  buttonSent: { backgroundColor: 'rgba(74,222,128,0.14)' },
+  buttonText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
+  iconButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -692,15 +595,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Estado vazio
-  vazio: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    paddingVertical: 50,
-  },
-  vazioIcone: {
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 50 },
+  emptyIcon: {
     width: 80,
     height: 80,
     borderRadius: 40,
@@ -708,10 +604,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  vazioTexto: {
-    fontFamily: TEXTO_SEMI,
-    color: TEXTO_SUAVE,
-    fontSize: 18,
-    textAlign: 'center',
-  },
+  emptyText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 18, textAlign: 'center' },
 });

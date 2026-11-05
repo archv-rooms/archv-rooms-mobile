@@ -12,6 +12,7 @@ import {
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 
+// Emulator core used for each console
 const CORES = {
   NES: 'nes',
   SNES: 'snes9x',
@@ -31,7 +32,7 @@ function getCore(consoleName) {
   return CORES[(consoleName || '').toUpperCase()] || 'nes';
 }
 
-function montarHtml(game) {
+function buildHtml(game) {
   const core = JSON.stringify(getCore(game.console));
   const url = JSON.stringify(game.fileUrl || '').replace(/</g, '\\u003c');
 
@@ -52,7 +53,7 @@ function montarHtml(game) {
   window.EJS_gameUrl = ${url};
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
   window.EJS_startOnLoaded = true;
-  // Avisa o app quando o jogo realmente começou
+  // Tells the app when the game has really started
   window.EJS_onGameStart = function () {
     var msg = 'ejs-game-started';
     if (window.ReactNativeWebView) {
@@ -68,30 +69,28 @@ function montarHtml(game) {
 }
 
 export default function GameScreen({ navigation, route }) {
-  const game = (route && route.params && route.params.game) || null;
+  const game = route?.params?.game || null;
   const { width, height } = useWindowDimensions();
-  const deitado = width > height;
-  const [carregando, setCarregando] = useState(true);
+  const landscape = width > height;
+  const [loading, setLoading] = useState(true);
 
-  // Na web: escuta o aviso que vem de dentro do iframe
+  // Web: listen for the message coming from inside the iframe
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
-    function aoReceber(evento) {
-      if (evento.data === 'ejs-game-started') {
-        setCarregando(false);
-      }
+    function onMessage(event) {
+      if (event.data === 'ejs-game-started') setLoading(false);
     }
-    window.addEventListener('message', aoReceber);
-    return () => window.removeEventListener('message', aoReceber);
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
-  // Segurança: se o aviso nunca chegar, tira a tela de carregando depois de 25s
+  // Safety net: if the message never arrives, hide the loading screen after 25s
   useEffect(() => {
-    const timer = setTimeout(() => setCarregando(false), 25000);
+    const timer = setTimeout(() => setLoading(false), 25000);
     return () => clearTimeout(timer);
   }, []);
 
-  function voltar() {
+  function goBack() {
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
@@ -99,76 +98,74 @@ export default function GameScreen({ navigation, route }) {
     }
   }
 
-  let conteudo;
+  let content;
 
   if (!game || !game.fileUrl) {
-    conteudo = (
-      <View style={styles.centro}>
-        <Text style={styles.mensagem}>Arquivo do jogo não disponível.</Text>
+    content = (
+      <View style={styles.center}>
+        <Text style={styles.message}>Arquivo do jogo não disponível.</Text>
       </View>
     );
   } else if (Platform.OS === 'web') {
-    conteudo = React.createElement('iframe', {
-      srcDoc: montarHtml(game),
+    content = React.createElement('iframe', {
+      srcDoc: buildHtml(game),
       title: game.title || 'Jogo',
       allow: 'autoplay; fullscreen; gamepad',
       allowFullScreen: true,
       style: { flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: '#000' },
     });
   } else {
-    conteudo = (
+    content = (
       <WebView
         style={styles.webview}
         originWhitelist={['*']}
-        source={{ html: montarHtml(game), baseUrl: 'https://archv-rooms.onrender.com' }}
+        source={{ html: buildHtml(game), baseUrl: 'https://archv-rooms.onrender.com' }}
         javaScriptEnabled
         domStorageEnabled
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
         onMessage={(e) => {
-          if (e.nativeEvent.data === 'ejs-game-started') {
-            setCarregando(false);
-          }
+          if (e.nativeEvent.data === 'ejs-game-started') setLoading(false);
         }}
       />
     );
   }
 
-  const mostrarCarregando = carregando && game && game.fileUrl;
+  const showLoading = loading && game && game.fileUrl;
 
   return (
     <View style={styles.container}>
-      <StatusBar hidden={deitado} />
+      <StatusBar hidden={landscape} />
 
-      {/* Em pé: barra de título normal */}
-      {!deitado && (
+      {/* Portrait: normal title bar */}
+      {!landscape && (
         <View style={styles.header}>
-          <TouchableOpacity onPress={voltar} style={styles.botaoVoltar}>
+          <TouchableOpacity onPress={goBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={26} color="#fff" />
           </TouchableOpacity>
-          <Text style={styles.titulo} numberOfLines={1}>
+          <Text style={styles.title} numberOfLines={1}>
             {game ? game.title : 'Jogo'}
           </Text>
         </View>
       )}
 
       <View style={styles.area}>
-        {conteudo}
+        {content}
 
-        {/* Tela de carregando por cima do emulador */}
-        {mostrarCarregando && (
-          <View style={styles.carregando}>
+        {/* Loading screen on top of the emulator */}
+        {showLoading && (
+          <View style={styles.loading}>
             <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.carregandoTitulo}>{game.title}</Text>
-            <Text style={styles.carregandoTexto}>Carregando jogo...</Text>
+            <Text style={styles.loadingTitle}>{game.title}</Text>
+            <Text style={styles.loadingText}>Carregando jogo...</Text>
           </View>
         )}
       </View>
 
-      {/* Deitado: tela cheia, só um botão de voltar por cima */}
-      {deitado && (
-        <TouchableOpacity onPress={voltar} style={styles.voltarFlutuante}>
+      {/* Landscape: full screen, only a floating back button */}
+      {landscape && (
+        <TouchableOpacity onPress={goBack} style={styles.floatingBack}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
         </TouchableOpacity>
       )}
@@ -177,10 +174,7 @@ export default function GameScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
+  container: { flex: 1, backgroundColor: '#000' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -189,43 +183,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: '#3A2F55',
   },
-  botaoVoltar: {
-    marginRight: 12,
-  },
-  titulo: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  area: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  carregando: {
+  backButton: { marginRight: 12 },
+  title: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '600' },
+  area: { flex: 1, backgroundColor: '#000' },
+  webview: { flex: 1, backgroundColor: '#000' },
+  loading: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#1E1830',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
-  carregandoTitulo: {
+  loadingTitle: {
     color: '#fff',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 20,
     textAlign: 'center',
   },
-  carregandoTexto: {
-    color: '#B8B0C8',
-    fontSize: 14,
-    marginTop: 6,
-  },
-  voltarFlutuante: {
+  loadingText: { color: '#B8B0C8', fontSize: 14, marginTop: 6 },
+  floatingBack: {
     position: 'absolute',
     top: 12,
     left: 12,
@@ -236,15 +213,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  centro: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  mensagem: {
-    color: '#FF9AA8',
-    fontSize: 16,
-    textAlign: 'center',
-  },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  message: { color: '#FF9AA8', fontSize: 16, textAlign: 'center' },
 });

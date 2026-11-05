@@ -61,20 +61,21 @@ export default function SignInScreen({ navigation }) {
     }).start();
   }, []);
 
-  function entrar() {
+  function goHome() {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }
 
   async function handleLogin() {
+    // Empty fields skip the login and enter without an account (test access)
     if (!email.trim() || !password) {
       await AsyncStorage.removeItem(TOKEN_KEY);
-      entrar();
+      goHome();
       return;
     }
     try {
       const res = await api.post('/auth/login', { email: email.trim(), password });
       await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
-      entrar();
+      goHome();
     } catch (e) {
       Alert.alert('Erro', 'E-mail ou senha incorretos.');
     }
