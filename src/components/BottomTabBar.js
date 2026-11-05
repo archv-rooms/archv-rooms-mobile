@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Pressable, Platform } from 'react-nat
 import { Ionicons } from '@expo/vector-icons';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
+import { vibrate } from '../services/settings';
 
 const NATIVE = Platform.OS !== 'web';
 const FONT_SEMI = 'Rajdhani_600SemiBold';
@@ -111,8 +112,14 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
   }, [menuOpen]);
 
   function goTo(routeName) {
+    vibrate(15);
     setMenuOpen(false);
     onNavigate(routeName);
+  }
+
+  function toggleMenu() {
+    vibrate(15);
+    setMenuOpen(!menuOpen);
   }
 
   if (!fontsLoaded) return null;
@@ -206,7 +213,7 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
           activeIcon="person-circle"
           label="Conta"
           active={accountActive}
-          onPress={() => setMenuOpen(!menuOpen)}
+          onPress={toggleMenu}
         />
       </Animated.View>
     </>

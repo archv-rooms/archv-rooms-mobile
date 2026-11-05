@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, Switch, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
+import { DEFAULTS, loadSettings, saveSettings, vibrate } from '../services/settings';
 
 const FONT_SEMI = 'Rajdhani_600SemiBold';
 const FONT_BOLD = 'Rajdhani_700Bold';
@@ -15,9 +15,6 @@ const SURFACE = '#2D2545';
 const BUTTON_PURPLE = '#6A5BD6';
 const WHITE = '#FFFFFF';
 const TEXT_MUTED = '#B4AACB';
-
-const SETTINGS_KEY = 'app_settings';
-const DEFAULTS = { sound: true, vibration: true, notifications: true };
 
 const OPTIONS = [
   { key: 'sound', icon: 'volume-high', label: 'Sons', desc: 'Efeitos sonoros nos jogos' },
@@ -30,17 +27,15 @@ export default function SettingsScreen() {
   const [settings, setSettings] = useState(DEFAULTS);
 
   useEffect(() => {
-    AsyncStorage.getItem(SETTINGS_KEY)
-      .then((raw) => {
-        if (raw) setSettings({ ...DEFAULTS, ...JSON.parse(raw) });
-      })
-      .catch(() => {});
+    loadSettings().then((saved) => setSettings({ ...saved }));
   }, []);
 
-  function toggle(key) {
+  async function toggle(key) {
     const next = { ...settings, [key]: !settings[key] };
     setSettings(next);
-    AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(next)).catch(() => {});
+    await saveSettings(next);
+    // Ao ligar a vibração, vibra uma vez para mostrar que funciona
+    if (key === 'vibration' && next.vibration) vibrate(60);
   }
 
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
