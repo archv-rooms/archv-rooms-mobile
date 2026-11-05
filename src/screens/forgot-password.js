@@ -1,90 +1,58 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
-  ActivityIndicator,
-  Animated,
-  Image,
-} from 'react-native';
+import { View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-import {
-  Rajdhani_500Medium,
-  Rajdhani_600SemiBold,
-  Rajdhani_700Bold,
-} from '@expo-google-fonts/rajdhani';
+import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import api from '../services/api';
 import { TEST_MODE } from '../services/mock';
-
-const NATIVE = Platform.OS !== 'web';
-
-const COLORS = {
-  gradient: ['#1E1830', '#3A2F55', '#5B4A7A'],
-  surface: '#4B4163',
-  button: '#6A5BD6',
-  accent: '#8E7CF0',
-  softText: '#B8B0C8',
-  error: '#FF9AA8',
-  success: '#9BE7B0',
-};
-
-const FONT = {
-  normal: 'Rajdhani_500Medium',
-  semi: 'Rajdhani_600SemiBold',
-  bold: 'Rajdhani_700Bold',
-};
+import {
+  COLORS,
+  FONT,
+  NATIVE,
+  FadeIn,
+  PressableScale,
+  AuthField,
+  PrimaryButton,
+  authStyles as s,
+} from '../components/auth-kit';
 
 function SentMessage() {
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(fade, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: NATIVE,
-    }).start();
+    Animated.timing(fade, { toValue: 1, duration: 400, useNativeDriver: NATIVE }).start();
   }, []);
 
   return (
-    <Animated.View style={[styles.sentBox, { opacity: fade }]}>
-      <Ionicons name="mail-outline" size={20} color={COLORS.success} />
-      <Text style={styles.sentText}>
-        If this email is registered, you will receive a link shortly.
+    <Animated.View
+      style={{
+        opacity: fade,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(74,222,128,0.12)',
+        borderRadius: 16,
+        padding: 14,
+        marginTop: 16,
+      }}
+    >
+      <Ionicons name="mail-outline" size={20} color={COLORS.green} />
+      <Text style={{ flex: 1, fontFamily: FONT.semi, color: COLORS.green, fontSize: 16 }}>
+        Se este e-mail estiver cadastrado, você receberá um link em instantes.
       </Text>
     </Animated.View>
   );
 }
 
 export default function ForgotPasswordScreen({ navigation }) {
-  const [fontsReady] = useFonts({
-    Rajdhani_500Medium,
-    Rajdhani_600SemiBold,
-    Rajdhani_700Bold,
-  });
+  const [fontsReady] = useFonts({ Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold });
 
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
-  const [focused, setFocused] = useState(false);
 
-  const fade = useRef(new Animated.Value(0)).current;
   const shake = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fade, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: NATIVE,
-    }).start();
-  }, []);
 
   function shakeForm() {
     Animated.sequence([
@@ -123,11 +91,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     }
 
     try {
-      await api.post(
-        '/auth/forgot-password',
-        { email: email.trim() },
-        { timeout: 90000 }
-      );
+      await api.post('/auth/forgot-password', { email: email.trim() }, { timeout: 90000 });
       setSent(true);
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
@@ -144,205 +108,63 @@ export default function ForgotPasswordScreen({ navigation }) {
     }
   }
 
-  if (!fontsReady) {
-    return <View style={{ flex: 1, backgroundColor: '#1E1830' }} />;
-  }
+  if (!fontsReady) return <View style={{ flex: 1, backgroundColor: COLORS.bgTop }} />;
 
   return (
-    <LinearGradient colors={COLORS.gradient} style={{ flex: 1 }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <TouchableOpacity
-            style={styles.back}
-            onPress={() => navigation.canGoBack() && navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={22} color="#fff" />
-          </TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: COLORS.bgTop }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <FadeIn>
+            <PressableScale
+              onPress={() => navigation.canGoBack() && navigation.goBack()}
+              style={s.back}
+              scale={0.82}
+            >
+              <Ionicons name="arrow-back" size={22} color="#fff" />
+            </PressableScale>
+          </FadeIn>
 
-          <Animated.View style={[styles.header, { opacity: fade }]}>
-            <Image
-              source={require('../../assets/logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.title}>Reset password</Text>
-            <Text style={styles.description}>
-              Enter the email linked to your account and we'll send you a link to
-              create a new password.
+          <FadeIn delay={80} style={s.header}>
+            <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
+            <Text style={s.title}>Redefinir senha</Text>
+            <Text style={[s.subtitle, { paddingHorizontal: 8 }]}>
+              Digite o e-mail da sua conta e enviaremos um link para criar uma nova senha.
             </Text>
-          </Animated.View>
+          </FadeIn>
 
-          <Animated.View style={{ opacity: fade, transform: [{ translateX: shake }] }}>
-            <View style={[styles.field, focused && styles.fieldFocus]}>
-              <Ionicons name="mail-outline" size={20} color={COLORS.softText} />
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor={COLORS.softText}
+          <FadeIn delay={160}>
+            <Animated.View style={{ transform: [{ translateX: shake }] }}>
+              <AuthField
+                icon="mail-outline"
+                placeholder="E-mail"
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
                   setSent(false);
                   setError('');
                 }}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                autoCapitalize="none"
                 keyboardType="email-address"
                 editable={!loading}
                 onSubmitEditing={handleSend}
               />
-            </View>
 
-            <TouchableOpacity
-              style={[styles.sendButton, loading && { opacity: 0.7 }]}
-              onPress={handleSend}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.sendText}>Send link</Text>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
+              <PrimaryButton label="Enviar link" onPress={handleSend} loading={loading} />
+            </Animated.View>
 
-          {sent && <SentMessage />}
-
-          {error !== '' && <Text style={styles.error}>{error}</Text>}
+            {sent && <SentMessage />}
+            {error !== '' && <Text style={[s.error, { textAlign: 'center', marginTop: 16 }]}>{error}</Text>}
+          </FadeIn>
 
           <View style={{ flex: 1, minHeight: 24 }} />
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Remembered it?</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('SignIn')}>
-              <Text style={styles.footerLink}>Log in</Text>
-            </TouchableOpacity>
-          </View>
+          <FadeIn delay={240} style={s.footer}>
+            <Text style={s.footerText}>Lembrou a senha?</Text>
+            <Pressable onPress={() => navigation.navigate('SignIn')}>
+              <Text style={s.footerLink}>Entrar</Text>
+            </Pressable>
+          </FadeIn>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 50,
-    paddingBottom: 32,
-  },
-  back: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 28,
-  },
-  logo: {
-    width: 84,
-    height: 84,
-    marginBottom: 14,
-  },
-  title: {
-    fontFamily: FONT.bold,
-    color: '#fff',
-    fontSize: 34,
-    letterSpacing: 0.5,
-  },
-  description: {
-    fontFamily: FONT.normal,
-    color: COLORS.softText,
-    fontSize: 18,
-    lineHeight: 22,
-    textAlign: 'center',
-    marginTop: 6,
-    paddingHorizontal: 8,
-  },
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 56,
-    marginBottom: 16,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  fieldFocus: {
-    borderColor: COLORS.accent,
-  },
-  input: {
-    flex: 1,
-    height: '100%',
-    color: '#fff',
-    fontFamily: FONT.semi,
-    fontSize: 18,
-  },
-  sendButton: {
-    backgroundColor: COLORS.button,
-    borderRadius: 28,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendText: {
-    fontFamily: FONT.bold,
-    color: '#fff',
-    fontSize: 20,
-    letterSpacing: 0.5,
-  },
-  sentBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(155, 231, 176, 0.12)',
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 16,
-  },
-  sentText: {
-    flex: 1,
-    fontFamily: FONT.semi,
-    color: COLORS.success,
-    fontSize: 16,
-  },
-  error: {
-    fontFamily: FONT.semi,
-    color: COLORS.error,
-    textAlign: 'center',
-    fontSize: 16,
-    marginTop: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  footerText: {
-    fontFamily: FONT.normal,
-    color: COLORS.softText,
-    fontSize: 17,
-  },
-  footerLink: {
-    fontFamily: FONT.bold,
-    color: '#fff',
-    fontSize: 17,
-  },
-});
