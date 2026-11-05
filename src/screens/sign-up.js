@@ -138,23 +138,13 @@ export default function SignUpScreen({ navigation }) {
     <View style={{ flex: 1, backgroundColor: COLORS.bgTop }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <FadeIn>
-            <PressableScale
-              onPress={() => navigation.canGoBack() && navigation.goBack()}
-              style={s.back}
-              scale={0.82}
-            >
-              <Ionicons name="arrow-back" size={22} color="#fff" />
-            </PressableScale>
-          </FadeIn>
-
-          <FadeIn delay={80} style={[s.header, { marginBottom: 24 }]}>
+          <FadeIn style={[s.header, { marginBottom: 24 }]}>
             <Image source={require('../../assets/logo.png')} style={[s.logo, { width: 72, height: 72 }]} resizeMode="contain" />
             <Text style={s.title}>Criar conta</Text>
             <Text style={s.subtitle}>Entre no Archv Rooms e comece a jogar</Text>
           </FadeIn>
 
-          <FadeIn delay={160}>
+          <FadeIn delay={100}>
             <Animated.View style={{ transform: [{ translateX: shake }] }}>
               <AuthField icon="person-outline" placeholder="Nome" value={name} onChangeText={setName} autoCapitalize="words" editable={!loading} />
               <AuthField icon="at-outline" placeholder="Username" value={username} onChangeText={setUsername} editable={!loading} />
@@ -208,7 +198,7 @@ export default function SignUpScreen({ navigation }) {
             Ao continuar, você concorda com os Termos e a Política de Privacidade.
           </Text>
 
-          <FadeIn delay={240}>
+          <FadeIn delay={200}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 }}>
               <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
               <Text style={s.link}>ou</Text>
@@ -234,7 +224,7 @@ export default function SignUpScreen({ navigation }) {
             </PressableScale>
           </FadeIn>
 
-          <FadeIn delay={320} style={[s.footer, { marginTop: 24 }]}>
+          <FadeIn delay={280} style={[s.footer, { marginTop: 24 }]}>
             <Text style={s.footerText}>Já tem conta?</Text>
             <Pressable onPress={() => navigation.navigate('SignIn')}>
               <Text style={s.footerLink}>Entrar</Text>

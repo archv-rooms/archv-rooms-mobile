@@ -141,19 +141,6 @@ function FadeIn({ delay = 0, style, children }) {
   );
 }
 
-// Purple lights drifting in the background
-function BackgroundOrbs() {
-  const a = useFloat(26, 5200);
-  const b = useFloat(32, 6800);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Animated.View style={[styles.orb1, { transform: [{ translateY: a }, { translateX: b }] }]} />
-      <Animated.View style={[styles.orb2, { transform: [{ translateY: b }, { translateX: a }] }]} />
-    </View>
-  );
-}
-
 // Heart that pops when favorited
 function HeartButton({ favorite, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -426,7 +413,6 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
-      <BackgroundOrbs />
 
       <View style={styles.container}>
         <FadeIn style={styles.header}>
@@ -557,25 +543,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
-  },
-
-  orb1: {
-    position: 'absolute',
-    top: -60,
-    right: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(142,124,240,0.14)',
-  },
-  orb2: {
-    position: 'absolute',
-    bottom: 120,
-    left: -100,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(106,91,214,0.12)',
   },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },

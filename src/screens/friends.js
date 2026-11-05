@@ -155,18 +155,6 @@ function AnimatedRow({ index, children }) {
   );
 }
 
-function BackgroundOrbs() {
-  const a = useFloat(26, 5200);
-  const b = useFloat(32, 6800);
-
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Animated.View style={[styles.orb1, { transform: [{ translateY: a }, { translateX: b }] }]} />
-      <Animated.View style={[styles.orb2, { transform: [{ translateY: b }, { translateX: a }] }]} />
-    </View>
-  );
-}
-
 function Avatar({ name }) {
   const color = colorFor(name);
   return (
@@ -308,13 +296,8 @@ export default function FriendsScreen({ navigation }) {
 
   return (
     <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
-      <BackgroundOrbs />
-
       <View style={styles.container}>
         <FadeIn style={styles.top}>
-          <PressableScale onPress={() => navigation.goBack()} style={styles.back} scale={0.82}>
-            <Ionicons name="arrow-back" size={22} color={WHITE} />
-          </PressableScale>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Amigos</Text>
             {loggedIn && (
@@ -465,34 +448,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
   },
 
-  orb1: {
-    position: 'absolute',
-    top: -60,
-    right: -80,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(142,124,240,0.14)',
-  },
-  orb2: {
-    position: 'absolute',
-    bottom: 80,
-    left: -100,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: 'rgba(106,91,214,0.12)',
-  },
-
   top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 },
-  back: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   title: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 28, letterSpacing: 0.5 },
   subtitle: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: -2 },
 

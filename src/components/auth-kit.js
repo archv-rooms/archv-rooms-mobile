@@ -126,15 +126,7 @@ export const authStyles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
     paddingBottom: 32,
   },
-  back: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: { alignItems: 'center', marginTop: 8, marginBottom: 30 },
+  header: { alignItems: 'center', marginTop: 30, marginBottom: 30 },
   logo: { width: 84, height: 84, marginBottom: 14 },
   title: { fontFamily: FONT.bold, color: '#fff', fontSize: 34, letterSpacing: 0.5 },
   subtitle: {

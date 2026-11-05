@@ -48,23 +48,13 @@ export default function SignInScreen({ navigation }) {
     <View style={{ flex: 1, backgroundColor: COLORS.bgTop }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <FadeIn>
-            <PressableScale
-              onPress={() => navigation.canGoBack() && navigation.goBack()}
-              style={s.back}
-              scale={0.82}
-            >
-              <Ionicons name="arrow-back" size={22} color="#fff" />
-            </PressableScale>
-          </FadeIn>
-
-          <FadeIn delay={80} style={s.header}>
+          <FadeIn style={s.header}>
             <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
             <Text style={s.title}>Bem-vindo de volta</Text>
             <Text style={s.subtitle}>Entre para continuar jogando</Text>
           </FadeIn>
 
-          <FadeIn delay={160}>
+          <FadeIn delay={100}>
             <AuthField
               icon="mail-outline"
               placeholder="E-mail"
@@ -96,7 +86,7 @@ export default function SignInScreen({ navigation }) {
             <PrimaryButton label="Entrar" onPress={handleLogin} />
           </FadeIn>
 
-          <FadeIn delay={240}>
+          <FadeIn delay={200}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 }}>
               <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
               <Text style={s.link}>ou</Text>
@@ -124,7 +114,7 @@ export default function SignInScreen({ navigation }) {
 
           <View style={{ flex: 1, minHeight: 24 }} />
 
-          <FadeIn delay={320} style={s.footer}>
+          <FadeIn delay={280} style={s.footer}>
             <Text style={s.footerText}>Não tem conta?</Text>
             <Pressable onPress={() => navigation.navigate('SignUp')}>
               <Text style={s.footerLink}>Criar conta</Text>

@@ -10,7 +10,6 @@ import {
   FONT,
   NATIVE,
   FadeIn,
-  PressableScale,
   AuthField,
   PrimaryButton,
   authStyles as s,
@@ -114,17 +113,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     <View style={{ flex: 1, backgroundColor: COLORS.bgTop }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <FadeIn>
-            <PressableScale
-              onPress={() => navigation.canGoBack() && navigation.goBack()}
-              style={s.back}
-              scale={0.82}
-            >
-              <Ionicons name="arrow-back" size={22} color="#fff" />
-            </PressableScale>
-          </FadeIn>
-
-          <FadeIn delay={80} style={s.header}>
+          <FadeIn style={s.header}>
             <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
             <Text style={s.title}>Redefinir senha</Text>
             <Text style={[s.subtitle, { paddingHorizontal: 8 }]}>
@@ -132,7 +121,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             </Text>
           </FadeIn>
 
-          <FadeIn delay={160}>
+          <FadeIn delay={100}>
             <Animated.View style={{ transform: [{ translateX: shake }] }}>
               <AuthField
                 icon="mail-outline"
@@ -157,7 +146,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
           <View style={{ flex: 1, minHeight: 24 }} />
 
-          <FadeIn delay={240} style={s.footer}>
+          <FadeIn delay={200} style={s.footer}>
             <Text style={s.footerText}>Lembrou a senha?</Text>
             <Pressable onPress={() => navigation.navigate('SignIn')}>
               <Text style={s.footerLink}>Entrar</Text>
