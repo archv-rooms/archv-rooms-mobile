@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import { MOCK_ROOMS } from '../services/mock';
+import { vibrate } from '../services/settings';
 
 const FONT_SEMI = 'Rajdhani_600SemiBold';
 const FONT_BOLD = 'Rajdhani_700Bold';
@@ -39,11 +40,13 @@ export default function RoomsScreen({ route }) {
     setRooms((list) => [room, ...list]);
     setJoinedIds((list) => [...list, room.id]);
     setNotice('Convite enviado para ' + inviteName);
+    vibrate(40);
     const timer = setTimeout(() => setNotice(''), 3500);
     return () => clearTimeout(timer);
   }, [inviteName, inviteTs]);
 
   function createRoom() {
+    vibrate(30);
     const room = {
       id: 'r' + Date.now(),
       game: 'Street Fighter II',
@@ -56,6 +59,7 @@ export default function RoomsScreen({ route }) {
   }
 
   function joinRoom(id) {
+    vibrate(30);
     setRooms(rooms.map((r) => (r.id === id ? { ...r, players: r.players + 1 } : r)));
     setJoinedIds([...joinedIds, id]);
   }

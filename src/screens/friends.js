@@ -17,6 +17,7 @@ import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOKEN_KEY } from '../services/api';
 import { MODO_TESTE } from '../services/mock';
+import { vibrate } from '../services/settings';
 import {
   listarAmigos,
   listarPendentes,
@@ -288,6 +289,7 @@ export default function FriendsScreen({ navigation }) {
   }
 
   async function enviarConvite(id) {
+    vibrate(30);
     try {
       await convidar(id);
       setResultados(resultados.map((u) => (u.id === id ? { ...u, requestSent: true } : u)));
@@ -295,6 +297,7 @@ export default function FriendsScreen({ navigation }) {
   }
 
   async function responderConvite(id, status) {
+    vibrate(30);
     try {
       await responder(id, status);
       if (MODO_TESTE) {
@@ -311,6 +314,7 @@ export default function FriendsScreen({ navigation }) {
 
   // Convida o amigo para uma sala: abre a tela de Salas já criando a sala
   function convidarParaSala(amigo) {
+    vibrate(30);
     navigation.navigate('Rooms', { invite: nomeDe(amigo), ts: Date.now() });
   }
 
