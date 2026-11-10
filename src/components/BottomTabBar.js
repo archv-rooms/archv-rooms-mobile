@@ -90,7 +90,7 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
     }).start();
   }, [activeIndex]);
 
-  // The bar slides up when visible and down when hidden (login, game, chat)
+  // The bar slides up when visible and down when hidden (login, game, chat, profile)
   useEffect(() => {
     if (!visible) setMenuOpen(false);
     Animated.spring(enterAnim, {
@@ -149,6 +149,10 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
         ]}
       >
         <View style={styles.menu}>
+          <PressableScale style={styles.menuItem} onPress={() => goTo('Profile')} scale={0.96}>
+            <Ionicons name="person-outline" size={20} color={WHITE} />
+            <Text style={styles.menuText}>Perfil</Text>
+          </PressableScale>
           <PressableScale style={styles.menuItem} onPress={() => goTo('Settings')} scale={0.96}>
             <Ionicons name="settings-outline" size={20} color={WHITE} />
             <Text style={styles.menuText}>Ajustes</Text>

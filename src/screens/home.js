@@ -22,6 +22,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import { TEST_MODE, TEST_GAMES } from '../services/mock';
 import { listSaves, removeSave } from '../services/saves';
+import { loadProfile, DEFAULT_PROFILE } from '../services/profile';
+import { Avatar } from './profile';
 
 const TABS = ['Recent', 'Games', 'Saves'];
 const TAB_LABEL = { Recent: 'Recentes', Games: 'Jogos', Saves: 'Saves' };
@@ -351,6 +353,7 @@ export default function HomeScreen({ navigation }) {
   const [favorites, setFavorites] = useState([]);
   const [recents, setRecents] = useState([]);
   const [saves, setSaves] = useState([]);
+  const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [refreshing, setRefreshing] = useState(false);
   const [tabsWidth, setTabsWidth] = useState(0);
 
@@ -407,10 +410,11 @@ export default function HomeScreen({ navigation }) {
     loadSaved();
   }, []);
 
-  // Reload the saves every time this screen comes back into focus
+  // Reload the saves and the profile every time this screen comes back into focus
   useFocusEffect(
     useCallback(() => {
       listSaves().then(setSaves);
+      loadProfile().then(setProfile);
     }, [])
   );
 
@@ -543,6 +547,15 @@ export default function HomeScreen({ navigation }) {
             style={[styles.logo, { transform: [{ translateY: logoFloat }] }]}
           />
           <Text style={styles.title}>archv.rooms</Text>
+
+          {/* Seu avatar: abre o perfil */}
+          <PressableScale
+            wrapStyle={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
+            scale={0.88}
+          >
+            <Avatar profile={profile} size={40} />
+          </PressableScale>
         </FadeIn>
 
         <FadeIn delay={100}>
@@ -686,6 +699,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
   logo: { width: 36, height: 36, resizeMode: 'contain' },
   title: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 28, letterSpacing: 0.5 },
+  profileButton: { marginLeft: 'auto' },
 
   tabs: {
     flexDirection: 'row',
