@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import { TEST_MODE, TEST_GAMES } from '../services/mock';
+import { listSaves, removeSave } from '../services/saves';
 
 const TABS = ['Recent', 'Games', 'Saves'];
 const TAB_LABEL = { Recent: 'Recentes', Games: 'Jogos', Saves: 'Saves' };
@@ -237,6 +239,34 @@ function GameCard({ game, index, favorite, onPress, onToggleFavorite }) {
   );
 }
 
+// One row in the Saves tab
+function SaveItem({ save, onPress, onDelete }) {
+  const color = consoleColor(save.console);
+  const initial = (save.title || '?').trim().charAt(0).toUpperCase();
+
+  return (
+    <PressableScale onPress={onPress} style={styles.saveItem} scale={0.97}>
+      <View style={[styles.saveIcon, { backgroundColor: color + '30' }]}>
+        <Text style={[styles.saveInitial, { color }]}>{initial}</Text>
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle} numberOfLines={1}>
+          {save.title}
+        </Text>
+        <Text style={styles.cardConsole} numberOfLines={1}>
+          {save.console ? save.console + ' · ' : ''}
+          {new Date(save.createdAt).toLocaleString('pt-BR')}
+        </Text>
+      </View>
+
+      <PressableScale onPress={onDelete} scale={0.8}>
+        <Ionicons name="trash-outline" size={22} color={PINK} />
+      </PressableScale>
+    </PressableScale>
+  );
+}
+
 function EmptyState({ icon, text }) {
   const float = useFloat(6, 1600);
 
@@ -260,6 +290,7 @@ export default function HomeScreen({ navigation }) {
   const [filter, setFilter] = useState('All');
   const [favorites, setFavorites] = useState([]);
   const [recents, setRecents] = useState([]);
+  const [saves, setSaves] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [tabsWidth, setTabsWidth] = useState(0);
 
@@ -316,6 +347,13 @@ export default function HomeScreen({ navigation }) {
     loadSaved();
   }, []);
 
+  // Reload the saves every time this screen comes back into focus
+  useFocusEffect(
+    useCallback(() => {
+      listSaves().then(setSaves);
+    }, [])
+  );
+
   async function loadGames() {
     if (TEST_MODE) {
       setGames(TEST_GAMES);
@@ -343,6 +381,7 @@ export default function HomeScreen({ navigation }) {
   async function refresh() {
     setRefreshing(true);
     await loadGames();
+    setSaves(await listSaves());
     setRefreshing(false);
   }
 
@@ -383,6 +422,29 @@ export default function HomeScreen({ navigation }) {
         message = e.response.data.message;
       }
       setError(message);
+    }
+  }
+
+  // Opens the game and loads the chosen save into it
+  function openSave(save) {
+    navigation.navigate('Game', {
+      game: {
+        id: save.gameId,
+        title: save.title,
+        console: save.console,
+        image: save.image,
+        fileUrl: save.fileUrl,
+      },
+      saveId: save.id,
+    });
+  }
+
+  async function deleteSave(id) {
+    try {
+      await removeSave(id);
+      setSaves(await listSaves());
+    } catch (e) {
+      setError('Não foi possível apagar o save.');
     }
   }
 
@@ -525,6 +587,21 @@ export default function HomeScreen({ navigation }) {
               />
             ))}
           </ScrollView>
+        ) : activeTab === 'Saves' && saves.length > 0 ? (
+          <ScrollView
+            style={styles.list}
+            contentContainerStyle={styles.savesContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {saves.map((save) => (
+              <SaveItem
+                key={save.id}
+                save={save}
+                onPress={() => openSave(save)}
+                onDelete={() => deleteSave(save.id)}
+              />
+            ))}
+          </ScrollView>
         ) : (
           <EmptyState
             key={activeTab + emptyText}
@@ -604,6 +681,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 150,
   },
+  savesContent: { paddingBottom: 150 },
   cardWrap: { width: '48%', marginBottom: 16 },
   card: {
     backgroundColor: SURFACE,
@@ -645,6 +723,26 @@ const styles = StyleSheet.create({
   cardInfo: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 12 },
   cardTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 17 },
   cardConsole: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: 1 },
+
+  saveItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: SURFACE,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  saveIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveInitial: { fontFamily: FONT_BOLD, fontSize: 24 },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingBottom: 100 },
   emptyIcon: {

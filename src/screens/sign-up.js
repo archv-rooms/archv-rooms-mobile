@@ -90,6 +90,11 @@ export default function SignUpScreen({ navigation }) {
     navigation.navigate('Onboarding', { fromSignUp: true });
   }
 
+  function handleGithub() {
+    // TODO: ligar ao OAuth do GitHub
+    Alert.alert('GitHub', 'Login com GitHub em breve.');
+  }
+
   async function handleSignUp() {
     if (loading) return;
 
@@ -206,6 +211,7 @@ export default function SignUpScreen({ navigation }) {
             </View>
 
             <PressableScale
+              onPress={handleGithub}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -219,8 +225,8 @@ export default function SignUpScreen({ navigation }) {
               }}
               scale={0.96}
             >
-              <Ionicons name="logo-google" size={18} color="#fff" />
-              <Text style={{ fontFamily: FONT.semi, color: '#fff', fontSize: 18 }}>Continuar com Google</Text>
+              <Ionicons name="logo-github" size={20} color="#fff" />
+              <Text style={{ fontFamily: FONT.semi, color: '#fff', fontSize: 18 }}>Continuar com GitHub</Text>
             </PressableScale>
           </FadeIn>
 

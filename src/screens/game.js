@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   StatusBar,
   ActivityIndicator,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { addSave, getSaveState } from '../services/saves';
 
 // Emulator core used for each console
 const CORES = {
@@ -68,11 +70,48 @@ function buildHtml(game) {
 </html>`;
 }
 
+// Reads the emulator state and sends it to the app as base64
+const SAVE_JS = `
+(function () {
+  try {
+    var state = window.EJS_emulator.gameManager.getState();
+    var bin = '';
+    var chunk = 0x8000;
+    for (var i = 0; i < state.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, state.subarray(i, i + chunk));
+    }
+    window.ReactNativeWebView.postMessage('ejs-state:' + btoa(bin));
+  } catch (e) {
+    window.ReactNativeWebView.postMessage('ejs-error:' + e.message);
+  }
+})();
+true;
+`;
+
+// Loads a base64 state back into the emulator
+function buildLoadJs(b64) {
+  return `
+(function () {
+  try {
+    var bin = atob(${JSON.stringify(b64)});
+    var arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    window.EJS_emulator.gameManager.loadState(arr);
+  } catch (e) {
+    window.ReactNativeWebView.postMessage('ejs-error:' + e.message);
+  }
+})();
+true;
+`;
+}
+
 export default function GameScreen({ navigation, route }) {
   const game = route?.params?.game || null;
+  const saveId = route?.params?.saveId || null;
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
   const [loading, setLoading] = useState(true);
+  const webRef = useRef(null);
 
   // Web: listen for the message coming from inside the iframe
   useEffect(() => {
@@ -98,6 +137,38 @@ export default function GameScreen({ navigation, route }) {
     }
   }
 
+  function saveGame() {
+    if (Platform.OS === 'web') {
+      Alert.alert('Indisponível', 'Salvar só funciona no app do celular.');
+      return;
+    }
+    if (webRef.current) webRef.current.injectJavaScript(SAVE_JS);
+  }
+
+  async function loadSaveIntoGame() {
+    try {
+      const b64 = await getSaveState(saveId);
+      if (b64 && webRef.current) webRef.current.injectJavaScript(buildLoadJs(b64));
+    } catch (e) {
+      Alert.alert('Erro', 'Não foi possível carregar o save.');
+    }
+  }
+
+  function handleMessage(data) {
+    if (typeof data !== 'string') return;
+    if (data === 'ejs-game-started') {
+      setLoading(false);
+      // small delay so the emulator is ready before loading the state
+      if (saveId) setTimeout(loadSaveIntoGame, 1500);
+    } else if (data.startsWith('ejs-state:')) {
+      addSave(game, data.slice('ejs-state:'.length))
+        .then(() => Alert.alert('Save criado', 'Veja na aba Saves.'))
+        .catch(() => Alert.alert('Erro', 'Não foi possível guardar o save.'));
+    } else if (data.startsWith('ejs-error:')) {
+      Alert.alert('Erro no emulador', data.slice('ejs-error:'.length));
+    }
+  }
+
   let content;
 
   if (!game || !game.fileUrl) {
@@ -117,6 +188,7 @@ export default function GameScreen({ navigation, route }) {
   } else {
     content = (
       <WebView
+        ref={webRef}
         style={styles.webview}
         originWhitelist={['*']}
         source={{ html: buildHtml(game), baseUrl: 'https://archv-rooms.onrender.com' }}
@@ -125,14 +197,13 @@ export default function GameScreen({ navigation, route }) {
         allowsInlineMediaPlayback
         mediaPlaybackRequiresUserAction={false}
         allowsFullscreenVideo
-        onMessage={(e) => {
-          if (e.nativeEvent.data === 'ejs-game-started') setLoading(false);
-        }}
+        onMessage={(e) => handleMessage(e.nativeEvent.data)}
       />
     );
   }
 
   const showLoading = loading && game && game.fileUrl;
+  const canSave = game && game.fileUrl && Platform.OS !== 'web';
 
   return (
     <View style={styles.container}>
@@ -147,6 +218,11 @@ export default function GameScreen({ navigation, route }) {
           <Text style={styles.title} numberOfLines={1}>
             {game ? game.title : 'Jogo'}
           </Text>
+          {canSave && (
+            <TouchableOpacity onPress={saveGame} style={styles.saveButton}>
+              <Ionicons name="save-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -163,10 +239,15 @@ export default function GameScreen({ navigation, route }) {
         )}
       </View>
 
-      {/* Landscape: full screen, only a floating back button */}
+      {/* Landscape: full screen, only floating buttons */}
       {landscape && (
         <TouchableOpacity onPress={goBack} style={styles.floatingBack}>
           <Ionicons name="arrow-back" size={22} color="#fff" />
+        </TouchableOpacity>
+      )}
+      {landscape && canSave && (
+        <TouchableOpacity onPress={saveGame} style={styles.floatingSave}>
+          <Ionicons name="save-outline" size={22} color="#fff" />
         </TouchableOpacity>
       )}
     </View>
@@ -184,6 +265,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3A2F55',
   },
   backButton: { marginRight: 12 },
+  saveButton: { marginLeft: 12 },
   title: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '600' },
   area: { flex: 1, backgroundColor: '#000' },
   webview: { flex: 1, backgroundColor: '#000' },
@@ -206,6 +288,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     left: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  floatingSave: {
+    position: 'absolute',
+    top: 12,
+    left: 60,
     width: 40,
     height: 40,
     borderRadius: 20,
