@@ -12,6 +12,7 @@ import FriendsScreen from './src/screens/friends';
 import ChatScreen from './src/screens/chat';
 import RoomsScreen from './src/screens/rooms';
 import LobbyScreen from './src/screens/room';
+import ProfileScreen from './src/screens/profile';
 import SettingsScreen from './src/screens/settings';
 import AboutScreen from './src/screens/about';
 import OnboardingScreen, { ONBOARDING_KEY } from './src/screens/onboarding';
@@ -68,6 +69,7 @@ export default function App() {
         <Stack.Screen name="Rooms" component={RoomsScreen} />
         <Stack.Screen name="Lobby" component={LobbyScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
       </Stack.Navigator>
