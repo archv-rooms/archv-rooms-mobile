@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
@@ -18,11 +18,23 @@ const WHITE = '#FFFFFF';
 const TEXT_MUTED = '#B4AACB';
 const GREEN = '#4ADE80';
 
+const GAMES = [
+  'Street Fighter II',
+  'Mortal Kombat',
+  'Super Mario World',
+  'Böbl',
+  'From Below',
+  'Spacegulls',
+];
+
 export default function RoomsScreen({ route }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
   const [rooms, setRooms] = useState(MOCK_ROOMS);
   const [joinedIds, setJoinedIds] = useState([]);
   const [notice, setNotice] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [selectedGame, setSelectedGame] = useState(GAMES[0]);
+  const [selectedMax, setSelectedMax] = useState(2);
 
   const inviteName = route?.params?.invite;
   const inviteTs = route?.params?.ts;
@@ -45,17 +57,25 @@ export default function RoomsScreen({ route }) {
     return () => clearTimeout(timer);
   }, [inviteName, inviteTs]);
 
-  function createRoom() {
+  function openCreate() {
+    vibrate(30);
+    setSelectedGame(GAMES[0]);
+    setSelectedMax(2);
+    setShowCreate(true);
+  }
+
+  function confirmCreate() {
     vibrate(30);
     const room = {
       id: 'r' + Date.now(),
-      game: 'Street Fighter II',
+      game: selectedGame,
       host: 'você',
       players: 1,
-      maxPlayers: 2,
+      maxPlayers: selectedMax,
     };
     setRooms([room, ...rooms]);
     setJoinedIds([...joinedIds, room.id]);
+    setShowCreate(false);
   }
 
   function joinRoom(id) {
@@ -71,7 +91,7 @@ export default function RoomsScreen({ route }) {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Salas</Text>
-          <Pressable style={styles.createButton} onPress={createRoom}>
+          <Pressable style={styles.createButton} onPress={openCreate}>
             <Ionicons name="add" size={18} color={WHITE} />
             <Text style={styles.createText}>Criar sala</Text>
           </Pressable>
@@ -115,6 +135,56 @@ export default function RoomsScreen({ route }) {
             );
           })}
         </ScrollView>
+
+        <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Criar sala</Text>
+
+              <Text style={styles.modalLabel}>Jogo</Text>
+              <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+                {GAMES.map((g) => {
+                  const active = g === selectedGame;
+                  return (
+                    <Pressable
+                      key={g}
+                      onPress={() => setSelectedGame(g)}
+                      style={[styles.option, active && styles.optionActive]}
+                    >
+                      <Text style={[styles.optionText, active && { color: WHITE }]}>{g}</Text>
+                      {active && <Ionicons name="checkmark-circle" size={20} color={WHITE} />}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              <Text style={styles.modalLabel}>Jogadores</Text>
+              <View style={styles.maxRow}>
+                {[2, 3, 4].map((n) => {
+                  const active = n === selectedMax;
+                  return (
+                    <Pressable
+                      key={n}
+                      onPress={() => setSelectedMax(n)}
+                      style={[styles.maxChip, active && styles.maxChipActive]}
+                    >
+                      <Text style={[styles.optionText, active && { color: WHITE }]}>{n}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <View style={styles.modalActions}>
+                <Pressable style={styles.cancelButton} onPress={() => setShowCreate(false)}>
+                  <Text style={styles.joinText}>Cancelar</Text>
+                </Pressable>
+                <Pressable style={[styles.joinButton, { flex: 1, alignItems: 'center' }]} onPress={confirmCreate}>
+                  <Text style={styles.joinText}>Criar</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </LinearGradient>
   );
@@ -131,6 +201,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 18,
+    paddingRight: 56,
   },
   title: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 28, letterSpacing: 0.5 },
   createButton: {
@@ -184,4 +255,49 @@ const styles = StyleSheet.create({
   },
   joinButtonOff: { backgroundColor: 'rgba(255,255,255,0.08)' },
   joinText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: BG_BOTTOM,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 36,
+  },
+  modalTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 24, marginBottom: 12 },
+  modalLabel: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: 12, marginBottom: 8 },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: SURFACE,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 48,
+    marginBottom: 8,
+  },
+  optionActive: { backgroundColor: BUTTON_PURPLE },
+  optionText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 16 },
+  maxRow: { flexDirection: 'row', gap: 10 },
+  maxChip: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: SURFACE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  maxChipActive: { backgroundColor: BUTTON_PURPLE },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  cancelButton: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    justifyContent: 'center',
+  },
 });
