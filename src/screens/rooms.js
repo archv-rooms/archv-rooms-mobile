@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -22,15 +22,19 @@ import { MOCK_ROOMS, TEST_GAMES, TEST_FRIENDS } from '../services/mock';
 import { vibrate } from '../services/settings';
 import { takeLobbyLeave } from './room';
 
+const NATIVE = Platform.OS !== 'web';
 const FONT_SEMI = 'Rajdhani_600SemiBold';
 const FONT_BOLD = 'Rajdhani_700Bold';
 
 const BG_TOP = '#14111F';
 const BG_BOTTOM = '#221B38';
 const SURFACE = '#2D2545';
+const SURFACE_LIGHT = '#3A3058';
+const ACCENT = '#8E7CF0';
 const BUTTON_PURPLE = '#6A5BD6';
 const WHITE = '#FFFFFF';
 const TEXT_MUTED = '#B4AACB';
+const SOFT = '#C4BAFF';
 const GREEN = '#4ADE80';
 const RED = '#FF8A9B';
 
@@ -43,76 +47,173 @@ const FILTERS = [
   { key: 'friends', label: 'Amigos' },
 ];
 
-// Cor de destaque de cada jogo (sempre a mesma para o mesmo nome)
-const ACCENTS = ['#8B7BFF', '#F0649A', '#F5A524', '#2FC4DB', '#4ADE80', '#FB7C3C'];
-
-function getAccent(name) {
-  let sum = 0;
-  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
-  return ACCENTS[sum % ACCENTS.length];
-}
+const SECTION_TITLE = {
+  all: 'Todas as salas',
+  open: 'Salas abertas',
+  friends: 'Salas de amigos',
+};
 
 function getCover(name) {
   const found = TEST_GAMES.find((g) => g.title === name);
   return found ? found.image : null;
 }
 
+// Só o estado usa cor (aberta, cheia, na sala). Os jogos não têm mais cor própria.
 function getStatus(joined, full) {
-  if (joined) return { label: 'NA SALA', color: '#C4BAFF' };
-  if (full) return { label: 'CHEIA', color: RED };
-  return { label: 'ABERTA', color: GREEN };
+  if (joined) return { label: 'NA SALA', color: SOFT, pulse: false };
+  if (full) return { label: 'CHEIA', color: RED, pulse: false };
+  return { label: 'ABERTA', color: GREEN, pulse: true };
 }
 
 function hostLabel(room) {
   return room.host === 'você' ? 'Sua sala' : 'Sala de ' + room.host;
 }
 
-// Entrada animada: fade + leve deslize para cima, com atraso por posição
-function FadeIn({ index = 0, children }) {
-  const anim = useRef(new Animated.Value(0)).current;
+// ---------- Animações reutilizáveis ----------
+
+// Botão que encolhe ao tocar e volta com mola
+function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93 }) {
+  const value = useRef(new Animated.Value(1)).current;
+
+  function pressIn() {
+    Animated.spring(value, { toValue: scale, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start();
+  }
+
+  function pressOut() {
+    Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 18, bounciness: 14 }).start();
+  }
+
+  return (
+    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} style={wrapStyle}>
+      <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
+    </Pressable>
+  );
+}
+
+// Aparece com fade e sobe com mola, com atraso opcional
+function FadeIn({ delay = 0, style, children }) {
+  const value = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 320,
-      delay: Math.min(index, 8) * 60,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 70, friction: 10 }),
+    ]).start();
   }, []);
 
   return (
     <Animated.View
-      style={{
-        opacity: anim,
-        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
-      }}
+      style={[
+        style,
+        {
+          opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+          transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
+        },
+      ]}
     >
       {children}
     </Animated.View>
   );
 }
 
-// Capa com fallback caso a imagem não carregue
-function Cover({ uri, accent, style, iconSize = 28 }) {
+// Valor que sobe e desce devagar
+function useFloat(amplitude, duration) {
+  const value = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(value, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
+        Animated.timing(value, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  return value.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
+}
+
+// Bolinha de status; quando pulse é true, ganha um anel que expande
+function LiveDot({ color, size = 7, pulse = false }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!pulse) return undefined;
+    const loop = Animated.loop(
+      Animated.timing(anim, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: NATIVE })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {pulse && (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: color,
+            opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
+            transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.8] }) }],
+          }}
+        />
+      )}
+      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />
+    </View>
+  );
+}
+
+// Capa com fallback neutro; com zoom, a imagem "respira" devagar
+function Cover({ uri, style, iconSize = 28, zoom = false }) {
   const [failed, setFailed] = useState(false);
+  const scale = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!zoom) return undefined;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1, duration: 9000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
+        Animated.timing(scale, { toValue: 0, duration: 9000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [zoom]);
+
   if (!uri || failed) {
     return (
       <LinearGradient
-        colors={[accent + '99', SURFACE]}
+        colors={[SURFACE_LIGHT, SURFACE]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[style, { alignItems: 'center', justifyContent: 'center' }]}
       >
-        <Ionicons name="game-controller" size={iconSize} color={WHITE} style={{ opacity: 0.5 }} />
+        <Ionicons name="game-controller" size={iconSize} color={WHITE} style={{ opacity: 0.35 }} />
       </LinearGradient>
     );
   }
-  return <Image source={{ uri }} style={style} resizeMode="cover" onError={() => setFailed(true)} />;
+
+  if (!zoom) {
+    return <Image source={{ uri }} style={style} resizeMode="cover" onError={() => setFailed(true)} />;
+  }
+
+  return (
+    <Animated.View
+      style={[style, { transform: [{ scale: scale.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] }) }] }]}
+    >
+      <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailed(true)} />
+    </Animated.View>
+  );
 }
 
+// ---------- Peças da tela ----------
+
 // Avatares sobrepostos (o primeiro é o anfitrião)
-function Avatars({ room, accent, size = 30 }) {
+function Avatars({ room, size = 26 }) {
   const hostInitial = (room.host || '?').charAt(0).toUpperCase();
   return (
     <View style={{ flexDirection: 'row' }}>
@@ -125,7 +226,7 @@ function Avatars({ room, accent, size = 30 }) {
               styles.avatar,
               { width: size, height: size, borderRadius: size / 2 },
               i > 0 && { marginLeft: -8 },
-              filled ? { backgroundColor: accent } : styles.avatarEmpty,
+              filled ? (i === 0 ? styles.avatarHost : styles.avatarFilled) : styles.avatarEmpty,
             ]}
           >
             {filled &&
@@ -141,33 +242,64 @@ function Avatars({ room, accent, size = 30 }) {
   );
 }
 
-// Botão Entrar / Sair / Cheia
-function JoinButton({ joined, full, accent, onJoin, onLeave, compact }) {
+// Botão Entrar / Sair / Cheia. compact vira um botão redondo só com ícone
+function JoinButton({ joined, full, onJoin, onLeave, compact }) {
   if (joined) {
     return (
-      <Pressable
+      <PressableScale
         onPress={onLeave}
-        style={[styles.joinButton, compact && styles.joinButtonCompact, styles.joinButtonLeave]}
+        style={[compact ? styles.iconButton : styles.joinButton, styles.leaveButton]}
       >
-        <Ionicons name="exit-outline" size={16} color={RED} />
-        <Text style={[styles.joinText, { color: RED }]}>Sair</Text>
-      </Pressable>
+        <Ionicons name="exit-outline" size={compact ? 20 : 16} color={RED} />
+        {!compact && <Text style={[styles.joinText, { color: RED }]}>Sair</Text>}
+      </PressableScale>
     );
   }
   return (
-    <Pressable
-      disabled={full}
-      onPress={onJoin}
+    <PressableScale
+      onPress={full ? undefined : onJoin}
       style={[
-        styles.joinButton,
-        compact && styles.joinButtonCompact,
-        !full && { backgroundColor: accent },
-        full && styles.joinButtonOff,
+        compact ? styles.iconButton : styles.joinButton,
+        full ? styles.buttonOff : styles.buttonOn,
       ]}
     >
-      <Ionicons name={full ? 'lock-closed' : 'play'} size={14} color={full ? TEXT_MUTED : WHITE} />
-      <Text style={[styles.joinText, full && { color: TEXT_MUTED }]}>{full ? 'Cheia' : 'Entrar'}</Text>
-    </Pressable>
+      <Ionicons
+        name={full ? 'lock-closed' : 'play'}
+        size={compact ? 18 : 14}
+        color={full ? TEXT_MUTED : WHITE}
+        style={!full && compact ? { marginLeft: 2 } : null}
+      />
+      {!compact && <Text style={[styles.joinText, full && { color: TEXT_MUTED }]}>{full ? 'Cheia' : 'Entrar'}</Text>}
+    </PressableScale>
+  );
+}
+
+// Selo de marcado no modal, aparece com um "pop"
+function TileCheck() {
+  const scale = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: NATIVE, speed: 16, bounciness: 18 }).start();
+  }, []);
+  return (
+    <Animated.View style={[styles.tileCheck, { transform: [{ scale }] }]}>
+      <Ionicons name="checkmark" size={14} color={WHITE} />
+    </Animated.View>
+  );
+}
+
+function EmptyState({ onCreate }) {
+  const float = useFloat(6, 1600);
+  return (
+    <FadeIn style={styles.empty}>
+      <Animated.View style={[styles.emptyIcon, { transform: [{ translateY: float }] }]}>
+        <Ionicons name="game-controller-outline" size={34} color={TEXT_MUTED} />
+      </Animated.View>
+      <Text style={styles.emptyText}>Nenhuma sala por aqui</Text>
+      <PressableScale onPress={onCreate} style={styles.emptyButton} scale={0.92}>
+        <Ionicons name="add" size={18} color={WHITE} />
+        <Text style={styles.createText}>Criar sala</Text>
+      </PressableScale>
+    </FadeIn>
   );
 }
 
@@ -181,17 +313,20 @@ export default function RoomsScreen({ route, navigation }) {
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
   const [selectedMax, setSelectedMax] = useState(2);
   const [carouselW, setCarouselW] = useState(Dimensions.get('window').width - 40);
-  const [page, setPage] = useState(0);
+  const [tabsWidth, setTabsWidth] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [animKey, setAnimKey] = useState(0);
+
   const carouselRef = useRef(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const filterAnim = useRef(new Animated.Value(0)).current;
 
   const inviteName = route?.params?.invite;
   const inviteTs = route?.params?.ts;
 
   // Chegou um convite vindo da tela de Amigos: cria a sala, avisa e abre o lobby
   useEffect(() => {
-    if (!inviteName) return;
+    if (!inviteName) return undefined;
     const room = {
       id: 'r' + Date.now(),
       game: 'Street Fighter II',
@@ -210,7 +345,7 @@ export default function RoomsScreen({ route, navigation }) {
 
   // Voltou do lobby: atualiza a lista (sala fechada ou vaga liberada)
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       const left = takeLobbyLeave();
       if (!left) return;
       if (left.closed) {
@@ -224,9 +359,20 @@ export default function RoomsScreen({ route, navigation }) {
 
   // Quando entra/sai de uma sala, o carrossel volta pro primeiro destaque
   useEffect(() => {
-    if (carouselRef.current) carouselRef.current.scrollTo({ x: 0, animated: false });
-    setPage(0);
+    const node = carouselRef.current;
+    if (node && node.scrollTo) node.scrollTo({ x: 0, animated: false });
   }, [joinedIds.length]);
+
+  // A pílula do filtro desliza
+  const filterIndex = FILTERS.findIndex((f) => f.key === filter);
+  useEffect(() => {
+    Animated.spring(filterAnim, {
+      toValue: filterIndex,
+      useNativeDriver: NATIVE,
+      tension: 140,
+      friction: 14,
+    }).start();
+  }, [filterIndex]);
 
   function openCreate() {
     vibrate(30);
@@ -276,6 +422,7 @@ export default function RoomsScreen({ route, navigation }) {
   }
 
   function changeFilter(key) {
+    if (key === filter) return;
     vibrate(15);
     setFilter(key);
   }
@@ -308,65 +455,72 @@ export default function RoomsScreen({ route, navigation }) {
     .forEach(addFeatured);
   rooms.forEach(addFeatured);
 
-  const activePage = Math.min(page, Math.max(featuredList.length - 1, 0));
-
-  // ---------- Contagem de cada filtro ----------
   const counts = {
     all: rooms.length,
     open: rooms.filter(isOpen).length,
     friends: rooms.filter(isFriend).length,
   };
 
-  // ---------- Lista filtrada ----------
   const list = rooms.filter((r) => {
     if (filter === 'open') return isOpen(r);
     if (filter === 'friends') return isFriend(r);
     return true;
   });
 
-  function renderFeatured(room) {
+  const tabWidth = tabsWidth > 0 ? (tabsWidth - 8) / FILTERS.length : 0;
+  const pillTranslate = filterAnim.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: [0, tabWidth, tabWidth * 2],
+  });
+
+  function renderFeatured(room, i) {
     const joined = joinedIds.includes(room.id);
     const full = room.players >= room.maxPlayers;
-    const accent = getAccent(room.game);
     const status = getStatus(joined, full);
+
+    const range = [(i - 1) * carouselW, i * carouselW, (i + 1) * carouselW];
+    const cardScale = scrollX.interpolate({ inputRange: range, outputRange: [0.92, 1, 0.92], extrapolate: 'clamp' });
+    const cardOpacity = scrollX.interpolate({ inputRange: range, outputRange: [0.55, 1, 0.55], extrapolate: 'clamp' });
 
     return (
       <View key={room.id} style={{ width: carouselW }}>
-        <View style={[styles.featured, { borderColor: accent + '66' }]}>
-          <Cover uri={getCover(room.game)} accent={accent} iconSize={56} style={StyleSheet.absoluteFill} />
-          {/* Degradê na parte de baixo, onde ficam as informações */}
-          <LinearGradient
-            colors={['transparent', 'rgba(20,17,31,0.94)']}
-            locations={[0.15, 1]}
-            style={StyleSheet.absoluteFill}
-          />
+        <Animated.View style={{ opacity: cardOpacity, transform: [{ scale: cardScale }] }}>
+          <View style={styles.featured}>
+            <Cover uri={getCover(room.game)} iconSize={56} zoom style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              colors={['rgba(20,17,31,0.6)', 'transparent', 'rgba(20,17,31,0.95)']}
+              locations={[0, 0.45, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
 
-          {/* Status: só bolinha + texto, sem caixa */}
-          <View style={styles.featuredStatus}>
-            <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-          </View>
+            <View style={styles.featuredStatus}>
+              <LiveDot color={status.color} pulse={status.pulse} />
+              <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+            </View>
 
-          <View style={styles.featuredContent}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.featuredContent}>
               <Text style={styles.featuredGame} numberOfLines={1}>{room.game}</Text>
-              <Text style={styles.sub} numberOfLines={1}>{hostLabel(room)}</Text>
-              <View style={styles.avatarsWrap}>
-                <Avatars room={room} accent={accent} size={26} />
-                <Text style={styles.count}>
-                  {room.players}/{room.maxPlayers}
-                </Text>
+              <View style={styles.featuredBottom}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sub} numberOfLines={1}>{hostLabel(room)}</Text>
+                  <View style={styles.avatarsWrap}>
+                    <Avatars room={room} size={26} />
+                    <Text style={styles.count}>
+                      {room.players}/{room.maxPlayers}
+                    </Text>
+                  </View>
+                </View>
+                <JoinButton
+                  joined={joined}
+                  full={full}
+                  onJoin={() => joinRoom(room.id)}
+                  onLeave={() => leaveRoom(room.id)}
+                />
               </View>
             </View>
-            <JoinButton
-              joined={joined}
-              full={full}
-              accent={accent}
-              onJoin={() => joinRoom(room.id)}
-              onLeave={() => leaveRoom(room.id)}
-            />
           </View>
-        </View>
+        </Animated.View>
       </View>
     );
   }
@@ -374,44 +528,55 @@ export default function RoomsScreen({ route, navigation }) {
   return (
     <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Salas</Text>
-          <Pressable style={styles.createButton} onPress={openCreate}>
+        {/* ---------- Cabeçalho ---------- */}
+        <FadeIn style={styles.header}>
+          <View>
+            <Text style={styles.title}>Salas</Text>
+            <View style={styles.subtitleRow}>
+              <LiveDot color={GREEN} size={6} pulse={counts.open > 0} />
+              <Text style={styles.subtitle}>
+                {counts.open === 1 ? '1 sala aberta agora' : counts.open + ' salas abertas agora'}
+              </Text>
+            </View>
+          </View>
+          <PressableScale onPress={openCreate} style={styles.createButton} scale={0.92}>
             <Ionicons name="add" size={18} color={WHITE} />
             <Text style={styles.createText}>Criar sala</Text>
-          </Pressable>
-        </View>
+          </PressableScale>
+        </FadeIn>
 
         {notice !== '' && (
-          <View style={styles.notice}>
-            <Ionicons name="checkmark-circle" size={20} color={GREEN} />
-            <Text style={styles.noticeText}>{notice}</Text>
-          </View>
+          <FadeIn key={notice}>
+            <View style={styles.notice}>
+              <Ionicons name="checkmark-circle" size={20} color={GREEN} />
+              <Text style={styles.noticeText}>{notice}</Text>
+            </View>
+          </FadeIn>
         )}
 
-        {/* ---------- Filtros com contagem (fixos, fora do scroll) ---------- */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipsScroll}
-          contentContainerStyle={styles.chipsRow}
-        >
-          {FILTERS.map((f) => {
-            const active = f.key === filter;
-            return (
-              <Pressable
-                key={f.key}
-                onPress={() => changeFilter(f.key)}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && { color: WHITE }]}>{f.label}</Text>
-                <View style={[styles.chipCount, active && styles.chipCountActive]}>
-                  <Text style={[styles.chipCountText, active && { color: WHITE }]}>{counts[f.key]}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        {/* ---------- Filtros: pílula que desliza (fixos, fora do scroll) ---------- */}
+        <FadeIn delay={80}>
+          <View style={styles.tabs} onLayout={(e) => setTabsWidth(e.nativeEvent.layout.width)}>
+            <Animated.View style={[styles.tabPill, { width: tabWidth, transform: [{ translateX: pillTranslate }] }]} />
+            {FILTERS.map((f) => {
+              const active = f.key === filter;
+              return (
+                <PressableScale
+                  key={f.key}
+                  wrapStyle={{ flex: 1 }}
+                  style={styles.tab}
+                  onPress={() => changeFilter(f.key)}
+                  scale={0.92}
+                >
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>{f.label}</Text>
+                  <View style={[styles.tabCount, active && styles.tabCountActive]}>
+                    <Text style={[styles.tabCountText, active && { color: WHITE }]}>{counts[f.key]}</Text>
+                  </View>
+                </PressableScale>
+              );
+            })}
+          </View>
+        </FadeIn>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -426,158 +591,176 @@ export default function RoomsScreen({ route, navigation }) {
             />
           }
         >
-          {/* ---------- Carrossel de destaques ---------- */}
+          {/* ---------- Destaques ---------- */}
           {featuredList.length > 0 && (
-            <View style={styles.carouselWrap} onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}>
-              <ScrollView
-                ref={carouselRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                scrollEventThrottle={16}
-                onScroll={(e) => {
-                  const i = Math.round(e.nativeEvent.contentOffset.x / carouselW);
-                  if (i !== page) setPage(i);
-                }}
-              >
-                {featuredList.map(renderFeatured)}
-              </ScrollView>
+            <FadeIn delay={160}>
+              <Text style={[styles.section, { marginTop: 18 }]}>EM DESTAQUE</Text>
+              <View style={styles.carouselWrap} onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}>
+                <Animated.ScrollView
+                  ref={carouselRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  scrollEventThrottle={16}
+                  onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+                    useNativeDriver: NATIVE,
+                  })}
+                >
+                  {featuredList.map(renderFeatured)}
+                </Animated.ScrollView>
 
-              {/* Pontinhos dentro do card, no canto superior direito */}
-              {featuredList.length > 1 && (
-                <View style={styles.dots} pointerEvents="none">
-                  {featuredList.map((r, i) => (
-                    <View key={r.id} style={[styles.dot, i === activePage && styles.dotActive]} />
-                  ))}
-                </View>
-              )}
-            </View>
+                {featuredList.length > 1 && (
+                  <View style={styles.dots} pointerEvents="none">
+                    {featuredList.map((r, i) => {
+                      const range = [(i - 1) * carouselW, i * carouselW, (i + 1) * carouselW];
+                      return (
+                        <Animated.View
+                          key={r.id}
+                          style={[
+                            styles.dot,
+                            {
+                              opacity: scrollX.interpolate({
+                                inputRange: range,
+                                outputRange: [0.4, 1, 0.4],
+                                extrapolate: 'clamp',
+                              }),
+                              transform: [
+                                {
+                                  scaleX: scrollX.interpolate({
+                                    inputRange: range,
+                                    outputRange: [1, 2.6, 1],
+                                    extrapolate: 'clamp',
+                                  }),
+                                },
+                              ],
+                            },
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            </FadeIn>
           )}
 
-          {/* ---------- Lista compacta (anima ao trocar filtro ou atualizar) ---------- */}
+          {/* ---------- Lista ---------- */}
+          <View style={styles.sectionRow}>
+            <Text style={styles.section}>{SECTION_TITLE[filter].toUpperCase()}</Text>
+            <Text style={styles.sectionCount}>{list.length}</Text>
+          </View>
+
           {list.map((room, index) => {
             const joined = joinedIds.includes(room.id);
             const full = room.players >= room.maxPlayers;
-            const accent = getAccent(room.game);
             const status = getStatus(joined, full);
 
             return (
-              <FadeIn key={filter + '-' + animKey + '-' + room.id} index={index}>
+              <FadeIn key={filter + '-' + animKey + '-' + room.id} delay={Math.min(index, 8) * 60}>
                 <View style={styles.row}>
-                  <Cover uri={getCover(room.game)} accent={accent} style={styles.thumb} iconSize={22} />
+                  <Cover uri={getCover(room.game)} style={styles.thumb} iconSize={22} />
 
                   <View style={styles.rowInfo}>
                     <Text style={styles.rowGame} numberOfLines={1}>{room.game}</Text>
                     <View style={styles.rowMeta}>
-                      <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+                      <LiveDot color={status.color} size={6} pulse={status.pulse} />
                       <Text style={styles.rowHost} numberOfLines={1}>{hostLabel(room)}</Text>
+                      <View style={styles.countPill}>
+                        <Ionicons name="people" size={12} color={TEXT_MUTED} />
+                        <Text style={styles.countPillText}>
+                          {room.players}/{room.maxPlayers}
+                        </Text>
+                      </View>
                     </View>
                   </View>
 
-                  <View style={styles.rowRight}>
-                    <Text style={styles.rowCount}>
-                      {room.players}/{room.maxPlayers}
-                    </Text>
-                    {full && !joined ? (
-                      <View style={styles.fullTag}>
-                        <Ionicons name="lock-closed" size={12} color={TEXT_MUTED} />
-                        <Text style={styles.fullTagText}>Cheia</Text>
-                      </View>
-                    ) : (
-                      <JoinButton
-                        compact
-                        joined={joined}
-                        full={full}
-                        accent={accent}
-                        onJoin={() => joinRoom(room.id)}
-                        onLeave={() => leaveRoom(room.id)}
-                      />
-                    )}
-                  </View>
+                  {full && !joined ? (
+                    <View style={styles.lockedIcon}>
+                      <Ionicons name="lock-closed" size={16} color={TEXT_MUTED} />
+                    </View>
+                  ) : (
+                    <JoinButton
+                      compact
+                      joined={joined}
+                      full={full}
+                      onJoin={() => joinRoom(room.id)}
+                      onLeave={() => leaveRoom(room.id)}
+                    />
+                  )}
                 </View>
               </FadeIn>
             );
           })}
 
-          {/* ---------- Estado vazio ---------- */}
-          {list.length === 0 && (
-            <View style={styles.empty}>
-              <Ionicons name="game-controller-outline" size={40} color={TEXT_MUTED} />
-              <Text style={styles.emptyText}>Nenhuma sala por aqui</Text>
-              <Pressable style={styles.emptyButton} onPress={openCreate}>
-                <Ionicons name="add" size={18} color={WHITE} />
-                <Text style={styles.createText}>Criar sala</Text>
-              </Pressable>
-            </View>
-          )}
+          {list.length === 0 && <EmptyState onCreate={openCreate} />}
         </ScrollView>
 
         {/* ---------- Modal criar sala ---------- */}
         <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)}>
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
+              <View style={styles.modalHandle} />
               <Text style={styles.modalTitle}>Criar sala</Text>
 
-              <Text style={styles.modalLabel}>Jogo</Text>
+              <Text style={styles.modalLabel}>JOGO</Text>
               <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
                 <View style={styles.grid}>
                   {GAMES.map((g) => {
                     const active = g === selectedGame;
-                    const accent = getAccent(g);
                     return (
-                      <Pressable
+                      <PressableScale
                         key={g}
+                        wrapStyle={styles.tileWrap}
                         onPress={() => {
                           vibrate(15);
                           setSelectedGame(g);
                         }}
-                        style={[
-                          styles.tile,
-                          { borderColor: active ? accent : 'transparent' },
-                          active && styles.tileActive,
-                        ]}
+                        style={[styles.tile, active && styles.tileActive]}
+                        scale={0.95}
                       >
-                        <Cover uri={getCover(g)} accent={accent} iconSize={30} style={StyleSheet.absoluteFill} />
+                        <Cover uri={getCover(g)} iconSize={30} style={StyleSheet.absoluteFill} />
                         <LinearGradient
                           colors={['transparent', 'rgba(20,17,31,0.92)']}
                           locations={[0.25, 1]}
                           style={StyleSheet.absoluteFill}
+                          pointerEvents="none"
                         />
-                        {active && (
-                          <View style={[styles.tileCheck, { backgroundColor: accent }]}>
-                            <Ionicons name="checkmark" size={14} color={WHITE} />
-                          </View>
-                        )}
+                        {active && <TileCheck />}
                         <Text style={styles.tileText} numberOfLines={2}>{g}</Text>
-                      </Pressable>
+                      </PressableScale>
                     );
                   })}
                 </View>
               </ScrollView>
 
-              <Text style={styles.modalLabel}>Jogadores</Text>
+              <Text style={styles.modalLabel}>JOGADORES</Text>
               <View style={styles.maxRow}>
                 {[2, 3, 4].map((n) => {
                   const active = n === selectedMax;
                   return (
-                    <Pressable
+                    <PressableScale
                       key={n}
-                      onPress={() => setSelectedMax(n)}
+                      wrapStyle={{ flex: 1 }}
+                      onPress={() => {
+                        vibrate(15);
+                        setSelectedMax(n);
+                      }}
                       style={[styles.maxChip, active && styles.maxChipActive]}
+                      scale={0.92}
                     >
                       <Text style={[styles.optionText, active && { color: WHITE }]}>{n}</Text>
-                    </Pressable>
+                    </PressableScale>
                   );
                 })}
               </View>
 
               <View style={styles.modalActions}>
-                <Pressable style={styles.cancelButton} onPress={() => setShowCreate(false)}>
+                <PressableScale onPress={() => setShowCreate(false)} style={styles.cancelButton} scale={0.95}>
                   <Text style={styles.modalButtonText}>Cancelar</Text>
-                </Pressable>
-                <Pressable style={styles.confirmButton} onPress={confirmCreate}>
+                </PressableScale>
+                <PressableScale wrapStyle={{ flex: 1 }} onPress={confirmCreate} style={styles.confirmButton} scale={0.96}>
                   <Text style={styles.modalButtonText}>Criar</Text>
-                </Pressable>
+                </PressableScale>
               </View>
             </View>
           </View>
@@ -593,14 +776,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
   },
+
+  // ---------- Cabeçalho ----------
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
-    paddingRight: 56,
+    marginBottom: 16,
   },
-  title: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 28, letterSpacing: 0.5 },
+  title: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 28, letterSpacing: 0.5, lineHeight: 30 },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  subtitle: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14 },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -624,85 +810,77 @@ const styles = StyleSheet.create({
   noticeText: { fontFamily: FONT_BOLD, color: GREEN, fontSize: 16 },
 
   // ---------- Filtros ----------
-  chipsScroll: { flexGrow: 0, marginBottom: 16 },
-  chipsRow: { flexDirection: 'row', gap: 8, paddingRight: 20 },
-  chip: {
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 24,
+    padding: 4,
+  },
+  tabPill: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    bottom: 4,
+    borderRadius: 20,
+    backgroundColor: BUTTON_PURPLE,
+    shadowColor: ACCENT,
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  tab: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: SURFACE,
-    borderRadius: 999,
-    paddingLeft: 16,
-    paddingRight: 8,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  chipActive: { backgroundColor: BUTTON_PURPLE },
-  chipText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 14 },
-  chipCount: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    paddingHorizontal: 6,
+  tabText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 15 },
+  tabTextActive: { color: WHITE, fontFamily: FONT_BOLD },
+  tabCount: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  chipCountActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
-  chipCountText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 12 },
+  tabCountActive: { backgroundColor: 'rgba(255,255,255,0.22)' },
+  tabCountText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 12 },
+
+  // ---------- Seções ----------
+  section: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 13, letterSpacing: 1.5 },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  sectionCount: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 13 },
 
   // ---------- Destaque / carrossel ----------
-  carouselWrap: { marginBottom: 18 },
+  carouselWrap: { marginTop: 10, marginBottom: 20 },
   featured: {
-    height: 170,
+    height: 176,
     backgroundColor: SURFACE,
     borderRadius: 24,
     borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
     justifyContent: 'flex-end',
   },
   featuredStatus: {
     position: 'absolute',
-    top: 14,
+    top: 16,
     left: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
   },
-  featuredContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-  },
-  featuredGame: {
-    fontFamily: FONT_BOLD,
-    color: WHITE,
-    fontSize: 26,
-    lineHeight: 28,
-  },
-  sub: { fontFamily: FONT_SEMI, color: '#D6CEE8', fontSize: 14, marginTop: 1 },
-  avatarsWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  count: { fontFamily: FONT_BOLD, color: '#D6CEE8', fontSize: 14 },
-
-  dots: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  dotActive: { width: 16, backgroundColor: WHITE },
-
-  // ---------- Status ----------
-  statusDot: { width: 7, height: 7, borderRadius: 4 },
   statusText: {
     fontFamily: FONT_BOLD,
     fontSize: 12,
@@ -710,14 +888,32 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowRadius: 4,
   },
+  featuredContent: { paddingHorizontal: 16, paddingBottom: 14 },
+  featuredGame: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 26, lineHeight: 28 },
+  featuredBottom: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, marginTop: 4 },
+  sub: { fontFamily: FONT_SEMI, color: '#D6CEE8', fontSize: 14 },
+  avatarsWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  count: { fontFamily: FONT_BOLD, color: '#D6CEE8', fontSize: 14 },
 
-  // ---------- Lista compacta ----------
+  dots: {
+    position: 'absolute',
+    top: 18,
+    right: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: WHITE },
+
+  // ---------- Lista ----------
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     backgroundColor: SURFACE,
     borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
     padding: 10,
     marginBottom: 10,
   },
@@ -726,26 +922,43 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: '#3A3158',
+    backgroundColor: SURFACE_LIGHT,
   },
   rowInfo: { flex: 1 },
   rowGame: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 17 },
-  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
-  rowHost: { flex: 1, fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 13 },
-  rowRight: { alignItems: 'flex-end', gap: 6 },
-  rowCount: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 13 },
-  fullTag: {
+  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  rowHost: { flexShrink: 1, fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 13 },
+  countPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 2,
   },
-  fullTagText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 13 },
+  countPillText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 12 },
+  lockedIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   // ---------- Estado vazio ----------
-  empty: { alignItems: 'center', gap: 10, paddingVertical: 30 },
-  emptyText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 16 },
+  empty: { alignItems: 'center', gap: 12, paddingVertical: 30 },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 17 },
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -764,61 +977,76 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarEmpty: { backgroundColor: '#3A3158' },
+  avatarHost: { backgroundColor: BUTTON_PURPLE },
+  avatarFilled: { backgroundColor: SURFACE_LIGHT },
+  avatarEmpty: { backgroundColor: 'rgba(255,255,255,0.08)' },
   avatarText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 12 },
 
-  // ---------- Botão entrar / sair ----------
+  // ---------- Botões entrar / sair ----------
   joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: BUTTON_PURPLE,
     borderRadius: 999,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  joinButtonCompact: { paddingHorizontal: 14, paddingVertical: 7 },
-  joinButtonLeave: {
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonOn: { backgroundColor: BUTTON_PURPLE },
+  buttonOff: { backgroundColor: 'rgba(255,255,255,0.08)' },
+  leaveButton: {
     backgroundColor: 'rgba(255,138,155,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255,138,155,0.4)',
   },
-  joinButtonOff: { backgroundColor: 'rgba(255,255,255,0.08)' },
   joinText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
 
   // ---------- Modal ----------
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: BG_BOTTOM,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     padding: 20,
+    paddingTop: 12,
     paddingBottom: 36,
   },
-  modalTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 24, marginBottom: 12 },
-  modalLabel: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: 12, marginBottom: 8 },
-
-  // Grade de jogos
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  modalHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 14,
   },
+  modalTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 24, marginBottom: 4 },
+  modalLabel: {
+    fontFamily: FONT_BOLD,
+    color: TEXT_MUTED,
+    fontSize: 13,
+    letterSpacing: 1.5,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  tileWrap: { width: '48.5%', marginBottom: 10 },
   tile: {
-    width: '48.5%',
     height: 92,
     borderRadius: 16,
     borderWidth: 2,
+    borderColor: 'transparent',
     overflow: 'hidden',
     justifyContent: 'flex-end',
     backgroundColor: SURFACE,
-    marginBottom: 10,
   },
-  tileActive: { transform: [{ scale: 1.02 }] },
+  tileActive: { borderColor: ACCENT },
   tileText: {
     fontFamily: FONT_BOLD,
     color: WHITE,
@@ -834,6 +1062,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
+    backgroundColor: BUTTON_PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -841,7 +1070,6 @@ const styles = StyleSheet.create({
   optionText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 16 },
   maxRow: { flexDirection: 'row', gap: 10 },
   maxChip: {
-    flex: 1,
     height: 44,
     borderRadius: 14,
     backgroundColor: SURFACE,
@@ -849,21 +1077,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   maxChipActive: { backgroundColor: BUTTON_PURPLE },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  modalActions: { flexDirection: 'row', gap: 10, marginTop: 22 },
   cancelButton: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 16,
     paddingHorizontal: 18,
-    paddingVertical: 10,
+    height: 48,
     justifyContent: 'center',
   },
   confirmButton: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: BUTTON_PURPLE,
     borderRadius: 16,
-    paddingVertical: 10,
+    height: 48,
   },
-  modalButtonText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
+  modalButtonText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 16 },
 });
