@@ -13,6 +13,7 @@ import {
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { addSave, getSaveState } from '../services/saves';
+import { useLandscape } from '../hooks/useLandscape';
 
 // Emulator core used for each console
 const CORES = {
@@ -106,6 +107,8 @@ true;
 }
 
 export default function GameScreen({ navigation, route }) {
+  useLandscape();
+
   const game = route?.params?.game || null;
   const saveId = route?.params?.saveId || null;
   const { width, height } = useWindowDimensions();
