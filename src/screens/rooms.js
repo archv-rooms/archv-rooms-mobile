@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Modal } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Platform, Modal, Image, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-import { MOCK_ROOMS } from '../services/mock';
+import { MOCK_ROOMS, TEST_GAMES, TEST_FRIENDS } from '../services/mock';
 import { vibrate } from '../services/settings';
 
 const FONT_SEMI = 'Rajdhani_600SemiBold';
@@ -19,13 +19,13 @@ const TEXT_MUTED = '#B4AACB';
 const GREEN = '#4ADE80';
 const RED = '#FF8A9B';
 
-const GAMES = [
-  'Street Fighter II',
-  'Mortal Kombat',
-  'Super Mario World',
-  'Böbl',
-  'From Below',
-  'Spacegulls',
+const GAMES = TEST_GAMES.map((g) => g.title);
+const FRIEND_USERNAMES = TEST_FRIENDS.map((f) => f.username);
+
+const FILTERS = [
+  { key: 'all', label: 'Todas' },
+  { key: 'open', label: 'Abertas' },
+  { key: 'friends', label: 'Amigos' },
 ];
 
 // Cor de destaque de cada jogo (sempre a mesma para o mesmo nome)
@@ -37,14 +37,122 @@ function getAccent(name) {
   return ACCENTS[sum % ACCENTS.length];
 }
 
+function getCover(name) {
+  const found = TEST_GAMES.find((g) => g.title === name);
+  return found ? found.image : null;
+}
+
+function getConsole(name) {
+  const found = TEST_GAMES.find((g) => g.title === name);
+  return found ? found.console : null;
+}
+
+function getStatus(joined, full) {
+  if (joined) return { label: 'NA SALA', color: '#C4BAFF' };
+  if (full) return { label: 'CHEIA', color: RED };
+  return { label: 'ABERTA', color: GREEN };
+}
+
+// Capa com fallback caso a imagem não carregue
+function Cover({ uri, accent, style, iconSize = 28 }) {
+  const [failed, setFailed] = useState(false);
+  if (!uri || failed) {
+    return (
+      <LinearGradient
+        colors={[accent + '99', SURFACE]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[style, { alignItems: 'center', justifyContent: 'center' }]}
+      >
+        <Ionicons name="game-controller" size={iconSize} color={WHITE} style={{ opacity: 0.5 }} />
+      </LinearGradient>
+    );
+  }
+  return <Image source={{ uri }} style={style} resizeMode="cover" onError={() => setFailed(true)} />;
+}
+
+// Etiquetinha do console (NES, SFC, GB)
+function ConsoleBadge({ label, style }) {
+  if (!label) return null;
+  return (
+    <View style={[styles.consoleBadge, style]}>
+      <Text style={styles.consoleBadgeText}>{label}</Text>
+    </View>
+  );
+}
+
+// Avatares sobrepostos (o primeiro é o anfitrião)
+function Avatars({ room, accent, size = 30 }) {
+  const hostInitial = (room.host || '?').charAt(0).toUpperCase();
+  return (
+    <View style={{ flexDirection: 'row' }}>
+      {Array.from({ length: room.maxPlayers }).map((_, i) => {
+        const filled = i < room.players;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.avatar,
+              { width: size, height: size, borderRadius: size / 2 },
+              i > 0 && { marginLeft: -10 },
+              filled ? { backgroundColor: accent } : styles.avatarEmpty,
+            ]}
+          >
+            {filled &&
+              (i === 0 ? (
+                <Text style={styles.avatarText}>{hostInitial}</Text>
+              ) : (
+                <Ionicons name="person" size={size * 0.45} color={WHITE} />
+              ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// Botão Entrar / Sair / Cheia
+function JoinButton({ joined, full, accent, onJoin, onLeave, compact }) {
+  if (joined) {
+    return (
+      <Pressable
+        onPress={onLeave}
+        style={[styles.joinButton, compact && styles.joinButtonCompact, styles.joinButtonLeave]}
+      >
+        <Ionicons name="exit-outline" size={16} color={RED} />
+        <Text style={[styles.joinText, { color: RED }]}>Sair</Text>
+      </Pressable>
+    );
+  }
+  return (
+    <Pressable
+      disabled={full}
+      onPress={onJoin}
+      style={[
+        styles.joinButton,
+        compact && styles.joinButtonCompact,
+        !full && { backgroundColor: accent },
+        full && styles.joinButtonOff,
+      ]}
+    >
+      <Ionicons name={full ? 'lock-closed' : 'play'} size={14} color={full ? TEXT_MUTED : WHITE} />
+      <Text style={[styles.joinText, full && { color: TEXT_MUTED }]}>{full ? 'Cheia' : 'Entrar'}</Text>
+    </Pressable>
+  );
+}
+
 export default function RoomsScreen({ route }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
   const [rooms, setRooms] = useState(MOCK_ROOMS);
   const [joinedIds, setJoinedIds] = useState([]);
   const [notice, setNotice] = useState('');
+  const [filter, setFilter] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
   const [selectedGame, setSelectedGame] = useState(GAMES[0]);
   const [selectedMax, setSelectedMax] = useState(2);
+  const [carouselW, setCarouselW] = useState(Dimensions.get('window').width - 40);
+  const [page, setPage] = useState(0);
+  const carouselRef = useRef(null);
 
   const inviteName = route?.params?.invite;
   const inviteTs = route?.params?.ts;
@@ -66,6 +174,12 @@ export default function RoomsScreen({ route }) {
     const timer = setTimeout(() => setNotice(''), 3500);
     return () => clearTimeout(timer);
   }, [inviteName, inviteTs]);
+
+  // Quando entra/sai de uma sala, o carrossel volta pro primeiro destaque
+  useEffect(() => {
+    if (carouselRef.current) carouselRef.current.scrollTo({ x: 0, animated: false });
+    setPage(0);
+  }, [joinedIds.length]);
 
   function openCreate() {
     vibrate(30);
@@ -90,11 +204,106 @@ export default function RoomsScreen({ route }) {
 
   function joinRoom(id) {
     vibrate(30);
-    setRooms(rooms.map((r) => (r.id === id ? { ...r, players: r.players + 1 } : r)));
+    setRooms(rooms.map((r) => (r.id === id && r.players < r.maxPlayers ? { ...r, players: r.players + 1 } : r)));
     setJoinedIds([...joinedIds, id]);
   }
 
+  // Sair: se a sala é sua, ela é fechada; senão só libera a vaga
+  function leaveRoom(id) {
+    vibrate(30);
+    const room = rooms.find((r) => r.id === id);
+    if (!room) return;
+    if (room.host === 'você') {
+      setRooms(rooms.filter((r) => r.id !== id));
+    } else {
+      setRooms(rooms.map((r) => (r.id === id ? { ...r, players: Math.max(1, r.players - 1) } : r)));
+    }
+    setJoinedIds(joinedIds.filter((j) => j !== id));
+  }
+
+  function changeFilter(key) {
+    vibrate(15);
+    setFilter(key);
+  }
+
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
+
+  // ---------- Destaques (até 3): sua sala, salas de amigos com vaga, salas mais cheias ----------
+  const isOpen = (r) => r.players < r.maxPlayers;
+  const featuredList = [];
+  const addFeatured = (r) => {
+    if (r && featuredList.length < 3 && !featuredList.some((f) => f.id === r.id)) featuredList.push(r);
+  };
+  rooms.filter((r) => joinedIds.includes(r.id)).forEach(addFeatured);
+  rooms.filter((r) => FRIEND_USERNAMES.includes(r.host) && isOpen(r)).forEach(addFeatured);
+  rooms
+    .filter(isOpen)
+    .sort((a, b) => b.players / b.maxPlayers - a.players / a.maxPlayers)
+    .forEach(addFeatured);
+  rooms.forEach(addFeatured);
+
+  const activePage = Math.min(page, Math.max(featuredList.length - 1, 0));
+
+  // ---------- Lista filtrada ----------
+  const list = rooms.filter((r) => {
+    if (filter === 'open') return isOpen(r);
+    if (filter === 'friends') return FRIEND_USERNAMES.includes(r.host);
+    return true;
+  });
+
+  function renderFeatured(room) {
+    const joined = joinedIds.includes(room.id);
+    const full = room.players >= room.maxPlayers;
+    const accent = getAccent(room.game);
+    const status = getStatus(joined, full);
+
+    return (
+      <View key={room.id} style={{ width: carouselW }}>
+        <View style={[styles.featured, { borderColor: accent + '66' }]}>
+          <View style={styles.featuredCover}>
+            <Cover uri={getCover(room.game)} accent={accent} iconSize={64} style={StyleSheet.absoluteFill} />
+            {/* Degradê só na parte de baixo, onde fica o título */}
+            <LinearGradient
+              colors={['transparent', 'rgba(45,37,69,0.97)']}
+              locations={[0.3, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+
+            <View style={styles.featuredStatus}>
+              <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+              <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+            </View>
+
+
+            <View style={styles.featuredTitleWrap}>
+              <Text style={styles.featuredGame} numberOfLines={2}>{room.game}</Text>
+              <Text style={styles.sub} numberOfLines={1}>
+                Sala de {room.host} • {room.maxPlayers} jogadores
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.featuredBottom}>
+            <View style={styles.avatarsWrap}>
+              <Avatars room={room} accent={accent} size={34} />
+              <Text style={styles.count}>
+                {room.players}/{room.maxPlayers}
+              </Text>
+            </View>
+            <JoinButton
+              joined={joined}
+              full={full}
+              accent={accent}
+              onJoin={() => joinRoom(room.id)}
+              onLeave={() => leaveRoom(room.id)}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  const firstIsMine = featuredList[0] && joinedIds.includes(featuredList[0].id) && activePage === 0;
 
   return (
     <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
@@ -115,110 +324,110 @@ export default function RoomsScreen({ route }) {
         )}
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
-          {rooms.map((room) => {
+          {/* ---------- Carrossel de destaques ---------- */}
+          {featuredList.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>{firstIsMine ? 'SUA SALA' : 'EM DESTAQUE'}</Text>
+              <View onLayout={(e) => setCarouselW(e.nativeEvent.layout.width)}>
+                <ScrollView
+                  ref={carouselRef}
+                  horizontal
+                  pagingEnabled
+                  showsHorizontalScrollIndicator={false}
+                  scrollEventThrottle={16}
+                  onScroll={(e) => {
+                    const i = Math.round(e.nativeEvent.contentOffset.x / carouselW);
+                    if (i !== page) setPage(i);
+                  }}
+                >
+                  {featuredList.map(renderFeatured)}
+                </ScrollView>
+              </View>
+
+              {featuredList.length > 1 && (
+                <View style={styles.dots}>
+                  {featuredList.map((r, i) => (
+                    <View key={r.id} style={[styles.dot, i === activePage && styles.dotActive]} />
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
+          {/* ---------- Filtros ---------- */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipsScroll}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {FILTERS.map((f) => {
+              const active = f.key === filter;
+              return (
+                <Pressable
+                  key={f.key}
+                  onPress={() => changeFilter(f.key)}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipText, active && { color: WHITE }]}>{f.label}</Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* ---------- Lista compacta ---------- */}
+          {list.map((room) => {
             const joined = joinedIds.includes(room.id);
             const full = room.players >= room.maxPlayers;
-            const disabled = joined || full;
             const accent = getAccent(room.game);
-            const hostInitial = (room.host || '?').charAt(0).toUpperCase();
-
-            let status = { label: 'ABERTA', color: GREEN };
-            if (joined) status = { label: 'NA SALA', color: '#C4BAFF' };
-            else if (full) status = { label: 'CHEIA', color: RED };
+            const status = getStatus(joined, full);
 
             return (
-              <LinearGradient
-                key={room.id}
-                colors={[accent + '55', SURFACE, SURFACE]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.card, { borderColor: accent + '55' }]}
-              >
-                {/* Ícone grande de marca d'água */}
-                <Ionicons
-                  name="game-controller"
-                  size={110}
-                  color={accent}
-                  style={styles.watermark}
-                />
-
-                {/* Status */}
-                <View style={styles.statusRow}>
-                  <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-                  <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+              <View key={room.id} style={styles.row}>
+                <View style={styles.thumbWrap}>
+                  <Cover uri={getCover(room.game)} accent={accent} style={styles.thumb} iconSize={26} />
                 </View>
 
-                {/* Título */}
-                <Text style={styles.game} numberOfLines={2}>{room.game}</Text>
-                <Text style={styles.sub} numberOfLines={1}>
-                  Sala de {room.host} • {room.maxPlayers} jogadores
-                </Text>
-
-                {/* Base */}
-                <View style={styles.bottomRow}>
-                  <View style={styles.avatarsWrap}>
-                    <View style={styles.avatars}>
-                      {Array.from({ length: room.maxPlayers }).map((_, i) => {
-                        const filled = i < room.players;
-                        return (
-                          <View
-                            key={i}
-                            style={[
-                              styles.avatar,
-                              i > 0 && { marginLeft: -10 },
-                              filled
-                                ? { backgroundColor: accent, borderColor: SURFACE }
-                                : styles.avatarEmpty,
-                            ]}
-                          >
-                            {filled &&
-                              (i === 0 ? (
-                                <Text style={styles.avatarText}>{hostInitial}</Text>
-                              ) : (
-                                <Ionicons name="person" size={14} color={WHITE} />
-                              ))}
-                          </View>
-                        );
-                      })}
-                    </View>
-                    <Text style={styles.count}>
-                      {room.players}/{room.maxPlayers}
+                <View style={styles.rowInfo}>
+                  <View style={styles.statusRow}>
+                    <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+                    <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                  </View>
+                  <Text style={styles.rowGame} numberOfLines={1}>{room.game}</Text>
+                  <View style={styles.rowMeta}>
+                    <Avatars room={room} accent={accent} size={22} />
+                    <Text style={styles.rowHost} numberOfLines={1}>
+                      {room.players}/{room.maxPlayers} • {room.host}
                     </Text>
                   </View>
-
-                  <Pressable
-                    disabled={disabled}
-                    onPress={() => joinRoom(room.id)}
-                    style={[
-                      styles.joinButton,
-                      !disabled && { backgroundColor: accent },
-                      joined && styles.joinButtonJoined,
-                      full && !joined && styles.joinButtonOff,
-                    ]}
-                  >
-                    {joined ? (
-                      <Ionicons name="checkmark" size={16} color={GREEN} />
-                    ) : full ? (
-                      <Ionicons name="lock-closed" size={14} color={TEXT_MUTED} />
-                    ) : (
-                      <Ionicons name="play" size={14} color={WHITE} />
-                    )}
-                    <Text
-                      style={[
-                        styles.joinText,
-                        joined && { color: GREEN },
-                        full && !joined && { color: TEXT_MUTED },
-                      ]}
-                    >
-                      {joined ? 'Na sala' : full ? 'Cheia' : 'Entrar'}
-                    </Text>
-                  </Pressable>
                 </View>
-              </LinearGradient>
+
+                <JoinButton
+                  compact
+                  joined={joined}
+                  full={full}
+                  accent={accent}
+                  onJoin={() => joinRoom(room.id)}
+                  onLeave={() => leaveRoom(room.id)}
+                />
+              </View>
             );
           })}
+
+          {/* ---------- Estado vazio ---------- */}
+          {list.length === 0 && (
+            <View style={styles.empty}>
+              <Ionicons name="game-controller-outline" size={40} color={TEXT_MUTED} />
+              <Text style={styles.emptyText}>Nenhuma sala por aqui</Text>
+              <Pressable style={styles.emptyButton} onPress={openCreate}>
+                <Ionicons name="add" size={18} color={WHITE} />
+                <Text style={styles.createText}>Criar sala</Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
 
+        {/* ---------- Modal criar sala ---------- */}
         <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)}>
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
@@ -309,57 +518,146 @@ const styles = StyleSheet.create({
   },
   noticeText: { fontFamily: FONT_BOLD, color: GREEN, fontSize: 16 },
 
-  // ---------- Card da sala ----------
-  card: {
+  sectionLabel: {
+    fontFamily: FONT_BOLD,
+    color: TEXT_MUTED,
+    fontSize: 12,
+    letterSpacing: 1.4,
+    marginBottom: 8,
+  },
+
+  // ---------- Destaque / carrossel ----------
+  featured: {
+    backgroundColor: SURFACE,
     borderRadius: 24,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
     overflow: 'hidden',
   },
-  watermark: {
-    position: 'absolute',
-    right: -14,
-    top: -10,
-    opacity: 0.12,
-    transform: [{ rotate: '-14deg' }],
+  featuredCover: {
+    height: 190,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
   },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  statusDot: { width: 7, height: 7, borderRadius: 4 },
-  statusText: { fontFamily: FONT_BOLD, fontSize: 12, letterSpacing: 1.2 },
-  game: {
+  featuredStatus: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(20,17,31,0.7)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  featuredTitleWrap: { paddingHorizontal: 16, paddingBottom: 10 },
+  featuredGame: {
     fontFamily: FONT_BOLD,
     color: WHITE,
-    fontSize: 26,
-    lineHeight: 28,
-    marginTop: 6,
-    paddingRight: 60,
+    fontSize: 28,
+    lineHeight: 30,
   },
-  sub: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: 2 },
-
-  bottomRow: {
+  featuredBottom: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 4,
   },
+  sub: { fontFamily: FONT_SEMI, color: '#D6CEE8', fontSize: 14, marginTop: 2 },
   avatarsWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatars: { flexDirection: 'row' },
-  avatar: {
-    width: 32,
-    height: 32,
+  count: { fontFamily: FONT_BOLD, color: '#D6CEE8', fontSize: 15 },
+
+  dots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+  },
+  dotActive: { width: 18, backgroundColor: BUTTON_PURPLE },
+
+  // ---------- Selo do console ----------
+  consoleBadge: {
+    backgroundColor: 'rgba(20,17,31,0.78)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  consoleBadgeText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 11, letterSpacing: 0.8 },
+
+  // ---------- Status ----------
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  statusText: { fontFamily: FONT_BOLD, fontSize: 12, letterSpacing: 1.2 },
+
+  // ---------- Filtros ----------
+  chipsScroll: { flexGrow: 0, marginTop: 16, marginBottom: 14 },
+  chipsRow: { flexDirection: 'row', gap: 8, paddingRight: 20 },
+  chip: {
+    backgroundColor: SURFACE,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  chipActive: { backgroundColor: BUTTON_PURPLE },
+  chipText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 14 },
+
+  // ---------- Lista compacta ----------
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: SURFACE,
+    borderRadius: 20,
+    padding: 10,
+    marginBottom: 10,
+  },
+  thumbWrap: { width: 72, height: 72 },
+  thumb: {
+    width: 72,
+    height: 72,
     borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#3A3158',
+  },
+  rowInfo: { flex: 1 },
+  rowGame: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 18, marginTop: 1 },
+  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  rowHost: { flex: 1, fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 13 },
+
+  // ---------- Estado vazio ----------
+  empty: { alignItems: 'center', gap: 10, paddingVertical: 30 },
+  emptyText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 16 },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: BUTTON_PURPLE,
+    borderRadius: 999,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginTop: 4,
+  },
+
+  // ---------- Avatares ----------
+  avatar: {
     borderWidth: 2,
+    borderColor: SURFACE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarEmpty: {
-    backgroundColor: '#3A3158',
-    borderColor: SURFACE,
-  },
-  avatarText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 14 },
-  count: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 15 },
+  avatarEmpty: { backgroundColor: '#3A3158' },
+  avatarText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 13 },
 
+  // ---------- Botão entrar / sair ----------
   joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -369,10 +667,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  joinButtonJoined: {
-    backgroundColor: 'rgba(74,222,128,0.12)',
+  joinButtonCompact: { paddingHorizontal: 14, paddingVertical: 8 },
+  joinButtonLeave: {
+    backgroundColor: 'rgba(255,138,155,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(74,222,128,0.4)',
+    borderColor: 'rgba(255,138,155,0.4)',
   },
   joinButtonOff: { backgroundColor: 'rgba(255,255,255,0.08)' },
   joinText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
