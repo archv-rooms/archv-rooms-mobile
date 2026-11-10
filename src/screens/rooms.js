@@ -15,10 +15,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from '@react-navigation/native';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import { MOCK_ROOMS, TEST_GAMES, TEST_FRIENDS } from '../services/mock';
 import { vibrate } from '../services/settings';
+import { takeLobbyLeave } from './room';
 
 const FONT_SEMI = 'Rajdhani_600SemiBold';
 const FONT_BOLD = 'Rajdhani_700Bold';
@@ -169,7 +171,7 @@ function JoinButton({ joined, full, accent, onJoin, onLeave, compact }) {
   );
 }
 
-export default function RoomsScreen({ route }) {
+export default function RoomsScreen({ route, navigation }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
   const [rooms, setRooms] = useState(MOCK_ROOMS);
   const [joinedIds, setJoinedIds] = useState([]);
@@ -187,7 +189,7 @@ export default function RoomsScreen({ route }) {
   const inviteName = route?.params?.invite;
   const inviteTs = route?.params?.ts;
 
-  // Chegou um convite vindo da tela de Amigos: cria a sala e avisa
+  // Chegou um convite vindo da tela de Amigos: cria a sala, avisa e abre o lobby
   useEffect(() => {
     if (!inviteName) return;
     const room = {
@@ -201,9 +203,24 @@ export default function RoomsScreen({ route }) {
     setJoinedIds((list) => [...list, room.id]);
     setNotice('Convite enviado para ' + inviteName);
     vibrate(40);
+    navigation.navigate('Lobby', { room, invited: inviteName });
     const timer = setTimeout(() => setNotice(''), 3500);
     return () => clearTimeout(timer);
   }, [inviteName, inviteTs]);
+
+  // Voltou do lobby: atualiza a lista (sala fechada ou vaga liberada)
+  useFocusEffect(
+    React.useCallback(() => {
+      const left = takeLobbyLeave();
+      if (!left) return;
+      if (left.closed) {
+        setRooms((list) => list.filter((r) => r.id !== left.id));
+      } else {
+        setRooms((list) => list.map((r) => (r.id === left.id ? { ...r, players: left.players } : r)));
+      }
+      setJoinedIds((list) => list.filter((j) => j !== left.id));
+    }, [])
+  );
 
   // Quando entra/sai de uma sala, o carrossel volta pro primeiro destaque
   useEffect(() => {
@@ -218,6 +235,7 @@ export default function RoomsScreen({ route }) {
     setShowCreate(true);
   }
 
+  // Cria a sala e abre o lobby como dono
   function confirmCreate() {
     vibrate(30);
     const room = {
@@ -230,12 +248,18 @@ export default function RoomsScreen({ route }) {
     setRooms([room, ...rooms]);
     setJoinedIds([...joinedIds, room.id]);
     setShowCreate(false);
+    navigation.navigate('Lobby', { room });
   }
 
+  // Entra na sala e abre o lobby
   function joinRoom(id) {
+    const room = rooms.find((r) => r.id === id);
+    if (!room || room.players >= room.maxPlayers) return;
     vibrate(30);
-    setRooms(rooms.map((r) => (r.id === id && r.players < r.maxPlayers ? { ...r, players: r.players + 1 } : r)));
+    const updated = { ...room, players: room.players + 1 };
+    setRooms(rooms.map((r) => (r.id === id ? updated : r)));
     setJoinedIds([...joinedIds, id]);
+    navigation.navigate('Lobby', { room: updated });
   }
 
   // Sair: se a sala é sua, ela é fechada; senão só libera a vaga
