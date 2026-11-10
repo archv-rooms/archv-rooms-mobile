@@ -9,6 +9,7 @@ import {
   Easing,
   Pressable,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,12 +35,26 @@ const BG_TOP = '#14111F';
 const BG_BOTTOM = '#221B38';
 const SURFACE = '#2D2545';
 const SURFACE_LIGHT = '#3A3058';
+const REQUEST_BG = '#352C5E';
 const ACCENT = '#8E7CF0';
 const BUTTON_PURPLE = '#6A5BD6';
 const WHITE = '#FFFFFF';
 const TEXT_MUTED = '#B4AACB';
 const GREEN = '#4ADE80';
+const PLAYING = '#C4BAFF';
+const OFFLINE_DOT = '#6E6586';
 const ERROR = '#FF9AA8';
+
+// Brilho roxo: no Android (elevation) vira mancha escura, então só usamos nas outras plataformas
+const GLOW =
+  Platform.OS === 'android'
+    ? {}
+    : {
+        shadowColor: ACCENT,
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+      };
 
 const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#C77CFF', '#FF4D4D'];
 
@@ -49,6 +64,18 @@ function colorFor(name) {
   for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
   return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 }
+
+// Text + color for each friend status
+function statusInfo(friend) {
+  if (friend.status === 'playing') {
+    return { label: friend.game ? 'Jogando ' + friend.game : 'Jogando', color: PLAYING, dot: PLAYING };
+  }
+  if (friend.status === 'online') return { label: 'Online', color: GREEN, dot: GREEN };
+  if (friend.status === 'offline') return { label: 'Offline', color: TEXT_MUTED, dot: OFFLINE_DOT };
+  return null;
+}
+
+const STATUS_ORDER = { playing: 0, online: 1, offline: 2 };
 
 // Value that slowly goes up and down
 function useFloat(amplitude, duration) {
@@ -155,13 +182,57 @@ function AnimatedRow({ index, children }) {
   );
 }
 
-function Avatar({ name }) {
+// Avatar: colored ring + dot when the friend is online/playing, faded when offline
+function Avatar({ name, size = 42, info }) {
   const color = colorFor(name);
+  const offline = info && info.dot === OFFLINE_DOT;
+  const ring = info && !offline;
   return (
-    <View style={[styles.avatar, { backgroundColor: color + '30', borderColor: color + '66' }]}>
-      <Text style={[styles.avatarText, { color }]}>{(name || '?').trim().charAt(0).toUpperCase()}</Text>
+    <View style={{ width: size, height: size }}>
+      <View
+        style={[
+          styles.avatar,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: color + (offline ? '18' : '30'),
+            borderColor: ring ? color : color + (offline ? '33' : '66'),
+            borderWidth: ring ? 2.5 : 1.5,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.avatarText,
+            { color, fontSize: Math.round(size * 0.48), opacity: offline ? 0.55 : 1 },
+          ]}
+        >
+          {(name || '?').trim().charAt(0).toUpperCase()}
+        </Text>
+      </View>
+      {info && <View style={[styles.onlineDot, { backgroundColor: info.dot }]} />}
     </View>
   );
+}
+
+// Section title with a counter (same look in every section)
+function SectionHeader({ title, count, highlight, onPress, open }) {
+  const content = (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.section}>{title}</Text>
+      <View style={[styles.badge, highlight && styles.badgeHighlight]}>
+        <Text style={[styles.badgeText, !highlight && { color: TEXT_MUTED }]}>{count}</Text>
+      </View>
+      {onPress && (
+        <View style={styles.chevronWrap}>
+          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={TEXT_MUTED} />
+        </View>
+      )}
+    </View>
+  );
+  if (!onPress) return content;
+  return <Pressable onPress={onPress}>{content}</Pressable>;
 }
 
 function AddButton({ sent, onPress }) {
@@ -210,6 +281,10 @@ export default function FriendsScreen({ navigation }) {
   const [pending, setPending] = useState([]);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [animKey, setAnimKey] = useState(0);
 
   const focusAnim = useRef(new Animated.Value(0)).current;
 
@@ -232,6 +307,14 @@ export default function FriendsScreen({ navigation }) {
     start();
   }, []);
 
+  async function onRefresh() {
+    setRefreshing(true);
+    vibrate(20);
+    await load();
+    setAnimKey((k) => k + 1);
+    setRefreshing(false);
+  }
+
   async function handleSearch(text) {
     setSearch(text);
     if (!text.trim()) {
@@ -241,6 +324,16 @@ export default function FriendsScreen({ navigation }) {
     try {
       setResults(await searchUsers(text));
     } catch (e) {}
+  }
+
+  function toggleSearch() {
+    vibrate(15);
+    if (searchOpen) {
+      setSearchOpen(false);
+      handleSearch('');
+    } else {
+      setSearchOpen(true);
+    }
   }
 
   async function sendRequest(id) {
@@ -292,6 +385,12 @@ export default function FriendsScreen({ navigation }) {
 
   const searching = search.trim() !== '';
 
+  // Playing first, then online, then offline
+  const sortedFriends = [...friends].sort(
+    (a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3)
+  );
+  const onlineCount = friends.filter((f) => f.status === 'online' || f.status === 'playing').length;
+
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
 
   return (
@@ -300,47 +399,68 @@ export default function FriendsScreen({ navigation }) {
         <FadeIn style={styles.top}>
           <View style={{ flex: 1 }}>
             <Text style={styles.title}>Amigos</Text>
-            {loggedIn && (
-              <Text style={styles.subtitle}>
-                {friends.length} {friends.length === 1 ? 'amigo' : 'amigos'}
-                {pending.length > 0 ? '  •  ' + pending.length + ' pedido(s)' : ''}
-              </Text>
+            {loggedIn && friends.length > 0 && (
+              <View style={styles.summary}>
+                <View style={[styles.summaryDot, onlineCount === 0 && { backgroundColor: OFFLINE_DOT }]} />
+                <Text style={styles.summaryText}>
+                  {onlineCount === 0 ? 'Ninguém online agora' : onlineCount + ' online agora'}
+                </Text>
+              </View>
             )}
           </View>
+          {loggedIn && (
+            <PressableScale onPress={toggleSearch} style={styles.searchToggle} scale={0.88}>
+              <Ionicons name={searchOpen ? 'close' : 'search'} size={20} color={WHITE} />
+            </PressableScale>
+          )}
         </FadeIn>
 
         {!loggedIn ? (
           <EmptyState icon="lock-closed-outline" text="Entre na sua conta para ver seus amigos" />
         ) : (
           <>
-            <FadeIn delay={100}>
-              <Animated.View
-                style={[styles.search, { borderColor: searchBorder, backgroundColor: searchBackground }]}
-              >
-                <Ionicons name="search" size={20} color={TEXT_MUTED} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar usuários"
-                  placeholderTextColor={TEXT_MUTED}
-                  value={search}
-                  onChangeText={handleSearch}
-                  onFocus={focusSearch}
-                  onBlur={blurSearch}
-                  autoCapitalize="none"
-                />
-                {search !== '' && (
-                  <PressableScale onPress={() => handleSearch('')} scale={0.8}>
-                    <Ionicons name="close-circle" size={20} color={TEXT_MUTED} />
-                  </PressableScale>
-                )}
-              </Animated.View>
-            </FadeIn>
+            {searchOpen && (
+              <FadeIn style={{ marginBottom: 4 }}>
+                <Animated.View
+                  style={[styles.search, { borderColor: searchBorder, backgroundColor: searchBackground }]}
+                >
+                  <Ionicons name="search" size={18} color={TEXT_MUTED} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Buscar usuários"
+                    placeholderTextColor={TEXT_MUTED}
+                    value={search}
+                    onChangeText={handleSearch}
+                    onFocus={focusSearch}
+                    onBlur={blurSearch}
+                    autoCapitalize="none"
+                    autoFocus
+                  />
+                  {search !== '' && (
+                    <PressableScale onPress={() => handleSearch('')} scale={0.8}>
+                      <Ionicons name="close-circle" size={20} color={TEXT_MUTED} />
+                    </PressableScale>
+                  )}
+                </Animated.View>
+              </FadeIn>
+            )}
 
             <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingBottom: 130 }}
+              contentContainerStyle={{ paddingBottom: 160 }}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  tintColor={WHITE}
+                  colors={[BUTTON_PURPLE]}
+                  progressBackgroundColor={SURFACE}
+                />
+              }
             >
+              {searching && <SectionHeader title="Resultados" count={results.length} />}
+
               {searching &&
                 results.map((user, i) => (
                   <AnimatedRow key={'search-' + user.id} index={i}>
@@ -360,77 +480,91 @@ export default function FriendsScreen({ navigation }) {
 
               {!searching && pending.length > 0 && (
                 <>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.section}>Pedidos</Text>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{pending.length}</Text>
-                    </View>
-                  </View>
-                  {pending.map((request, i) => {
-                    const name = displayName(request.sender || request.user || request);
-                    return (
-                      <AnimatedRow key={'request-' + request.id} index={i}>
-                        <View style={styles.row}>
-                          <Avatar name={name} />
-                          <Text style={styles.name} numberOfLines={1}>
-                            {name}
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <PressableScale
-                              onPress={() => answerRequest(request.id, 'accepted')}
-                              style={[styles.iconButton, { backgroundColor: BUTTON_PURPLE }]}
-                              scale={0.8}
-                            >
-                              <Ionicons name="checkmark" size={20} color={WHITE} />
-                            </PressableScale>
-                            <PressableScale
-                              onPress={() => answerRequest(request.id, 'rejected')}
-                              style={[styles.iconButton, { backgroundColor: SURFACE_LIGHT }]}
-                              scale={0.8}
-                            >
-                              <Ionicons name="close" size={20} color={ERROR} />
-                            </PressableScale>
+                  <SectionHeader
+                    title="Pedidos"
+                    count={pending.length}
+                    highlight
+                    open={pendingOpen}
+                    onPress={() => {
+                      vibrate(15);
+                      setPendingOpen(!pendingOpen);
+                    }}
+                  />
+                  {pendingOpen &&
+                    pending.map((request, i) => {
+                      const name = displayName(request.sender || request.user || request);
+                      return (
+                        <AnimatedRow key={'request-' + animKey + '-' + request.id} index={i}>
+                          <View style={[styles.row, styles.rowRequest]}>
+                            <Avatar name={name} size={36} />
+                            <Text style={styles.name} numberOfLines={1}>
+                              {name}
+                            </Text>
+                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                              <PressableScale
+                                onPress={() => answerRequest(request.id, 'accepted')}
+                                style={[styles.iconButton, { backgroundColor: BUTTON_PURPLE }]}
+                                scale={0.8}
+                              >
+                                <Ionicons name="checkmark" size={18} color={WHITE} />
+                              </PressableScale>
+                              <PressableScale
+                                onPress={() => answerRequest(request.id, 'rejected')}
+                                style={[styles.iconButton, { backgroundColor: SURFACE_LIGHT }]}
+                                scale={0.8}
+                              >
+                                <Ionicons name="close" size={18} color={ERROR} />
+                              </PressableScale>
+                            </View>
                           </View>
-                        </View>
-                      </AnimatedRow>
-                    );
-                  })}
+                        </AnimatedRow>
+                      );
+                    })}
                 </>
               )}
 
               {!searching && (
                 <>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.section}>Amigos</Text>
-                  </View>
+                  <SectionHeader title="Amigos" count={friends.length} />
                   {friends.length === 0 && (
                     <EmptyState key="no-friends" icon="people-outline" text="Nenhum amigo ainda" />
                   )}
-                  {friends.map((friend, i) => (
-                    <AnimatedRow key={'friend-' + friend.id} index={i}>
-                      <PressableScale
-                        style={styles.row}
-                        onPress={() => navigation.navigate('Chat', { friend })}
-                        scale={0.96}
-                      >
-                        <Avatar name={displayName(friend)} />
-                        <Text style={styles.name} numberOfLines={1}>
-                          {displayName(friend)}
-                        </Text>
+                  {sortedFriends.map((friend, i) => {
+                    const info = statusInfo(friend);
+                    const offline = friend.status === 'offline';
+                    return (
+                      <AnimatedRow key={'friend-' + animKey + '-' + friend.id} index={i}>
                         <PressableScale
-                          onPress={() => inviteToRoom(friend)}
-                          style={styles.inviteButton}
-                          scale={0.88}
+                          style={[styles.row, offline && styles.rowOffline]}
+                          onPress={() => navigation.navigate('Chat', { friend })}
+                          scale={0.97}
                         >
-                          <Ionicons name="game-controller" size={16} color={WHITE} />
-                          <Text style={styles.buttonText}>Convidar</Text>
+                          <Avatar name={displayName(friend)} info={info} />
+                          <View style={styles.friendInfo}>
+                            <Text style={styles.nameInline} numberOfLines={1}>
+                              {displayName(friend)}
+                            </Text>
+                            {info && (
+                              <Text style={[styles.status, { color: info.color }]} numberOfLines={1}>
+                                {info.label}
+                              </Text>
+                            )}
+                          </View>
+                          {!offline && (
+                            <PressableScale
+                              onPress={() => inviteToRoom(friend)}
+                              style={styles.playButton}
+                              scale={0.88}
+                            >
+                              <Ionicons name="game-controller" size={16} color={WHITE} />
+                              <Text style={styles.buttonText}>Jogar</Text>
+                            </PressableScale>
+                          )}
+                          <Ionicons name="chatbubble-outline" size={20} color={TEXT_MUTED} />
                         </PressableScale>
-                        <View style={styles.chatIcon}>
-                          <Ionicons name="chatbubble" size={16} color={WHITE} />
-                        </View>
-                      </PressableScale>
-                    </AnimatedRow>
-                  ))}
+                      </AnimatedRow>
+                    );
+                  })}
                 </>
               )}
             </ScrollView>
@@ -448,26 +582,42 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 60 : 50,
   },
 
-  top: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 18 },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    paddingRight: 56,
+  },
   title: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 28, letterSpacing: 0.5 },
-  subtitle: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: -2 },
+  summary: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  summaryDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: GREEN },
+  summaryText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14 },
+  searchToggle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: SURFACE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1.5,
-    paddingHorizontal: 16,
-    height: 50,
+    paddingHorizontal: 14,
+    height: 44,
   },
-  searchInput: { flex: 1, height: '100%', color: WHITE, fontFamily: FONT_SEMI, fontSize: 18 },
+  searchInput: { flex: 1, height: '100%', color: WHITE, fontFamily: FONT_SEMI, fontSize: 17 },
 
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 22, marginBottom: 10 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 10 },
   section: {
     fontFamily: FONT_BOLD,
     color: TEXT_MUTED,
-    fontSize: 16,
+    fontSize: 14,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
@@ -476,16 +626,16 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     paddingHorizontal: 6,
-    backgroundColor: BUTTON_PURPLE,
+    backgroundColor: SURFACE_LIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: ACCENT,
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
   },
-  badgeText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 13 },
+  badgeHighlight: {
+    backgroundColor: BUTTON_PURPLE,
+    ...GLOW,
+  },
+  badgeText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 12 },
+  chevronWrap: { flex: 1, alignItems: 'flex-end' },
 
   row: {
     flexDirection: 'row',
@@ -499,29 +649,39 @@ const styles = StyleSheet.create({
     height: 64,
     marginBottom: 10,
   },
+  rowOffline: { opacity: 0.6 },
+  rowRequest: {
+    height: 54,
+    borderRadius: 18,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    backgroundColor: REQUEST_BG,
+    borderColor: 'rgba(142,124,240,0.6)',
+    ...GLOW,
+  },
+
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontFamily: FONT_BOLD, fontSize: 20 },
+  avatarText: { fontFamily: FONT_BOLD },
+  onlineDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    borderWidth: 2.5,
+    borderColor: SURFACE,
+  },
+
+  // Nome sozinho na linha (ocupa o espaço do meio)
   name: { flex: 1, fontFamily: FONT_BOLD, color: WHITE, fontSize: 18 },
-  chatIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: BUTTON_PURPLE,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: ACCENT,
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 3,
-  },
+  // Nome dentro da coluna nome + status (sem flex, para não esticar na vertical)
+  friendInfo: { flex: 1, justifyContent: 'center' },
+  nameInline: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 18 },
+  status: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 13, marginTop: 1 },
 
   button: {
     flexDirection: 'row',
@@ -532,21 +692,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  inviteButton: {
+  playButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: SURFACE_LIGHT,
-    borderRadius: 16,
+    gap: 5,
+    backgroundColor: BUTTON_PURPLE,
+    borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   buttonSent: { backgroundColor: 'rgba(74,222,128,0.14)' },
   buttonText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
   iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
