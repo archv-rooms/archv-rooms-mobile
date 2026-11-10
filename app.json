@@ -3,7 +3,7 @@
     "name": "archv.rooms",
     "slug": "archv-rooms-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "archvroomsmobile",
     "userInterfaceStyle": "dark",
@@ -44,7 +44,8 @@
       "expo-image",
       "expo-status-bar",
       "expo-web-browser",
-      "expo-audio"
+      "expo-audio",
+      "expo-screen-orientation"
     ],
     "experiments": {
       "reactCompiler": true
