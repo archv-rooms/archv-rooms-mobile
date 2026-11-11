@@ -11,7 +11,6 @@ import {
   Image,
   Platform,
   RefreshControl,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,6 +23,7 @@ import { TEST_MODE, TEST_GAMES } from '../services/mock';
 import { listSaves, removeSave } from '../services/saves';
 import { loadProfile, DEFAULT_PROFILE } from '../services/profile';
 import { Avatar } from './profile';
+import { showAlert } from '../components/AppModal';
 
 const TABS = ['Recent', 'Games', 'Saves'];
 const TAB_LABEL = { Recent: 'Recentes', Games: 'Jogos', Saves: 'Saves' };
@@ -272,7 +272,7 @@ function SaveItem({ save, index, onPress, onDelete }) {
   const hasImage = save.image && !imageFailed;
 
   function confirmDelete() {
-    Alert.alert('Apagar save', 'Tem certeza que quer apagar este save?', [
+    showAlert('Apagar save', 'Tem certeza que quer apagar este save?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Apagar', style: 'destructive', onPress: onDelete },
     ]);

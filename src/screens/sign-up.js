@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, Alert, Animated, Pressable } from 'react-native';
+import { View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import api from '../services/api';
 import { TEST_MODE } from '../services/mock';
+import { showAlert } from '../components/AppModal';
 import {
   COLORS,
   FONT,
@@ -82,7 +83,7 @@ export default function SignUpScreen({ navigation }) {
   }
 
   function showBirthInfo() {
-    Alert.alert('Data de nascimento', 'Usamos sua data de nascimento para confirmar que você tem idade para usar o archv-rooms.');
+    showAlert('Data de nascimento', 'Usamos sua data de nascimento para confirmar que você tem idade para usar o archv-rooms.');
   }
 
   // After sign up, show the onboarding; it ends at the login screen
@@ -92,7 +93,7 @@ export default function SignUpScreen({ navigation }) {
 
   function handleGithub() {
     // TODO: ligar ao OAuth do GitHub
-    Alert.alert('GitHub', 'Login com GitHub em breve.');
+    showAlert('GitHub', 'Login com GitHub em breve.');
   }
 
   async function handleSignUp() {

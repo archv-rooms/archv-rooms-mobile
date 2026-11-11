@@ -9,7 +9,6 @@ import {
   Platform,
   Image,
   Modal,
-  Alert,
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +19,7 @@ import { useFonts } from 'expo-font';
 import { TEST_GAMES, TEST_FRIENDS } from '../services/mock';
 import { vibrate } from '../services/settings';
 import { loadProfile, saveProfile, DEFAULT_PROFILE } from '../services/profile';
+import { showAlert } from '../components/AppModal';
 
 const FONT_SEMI = 'Rajdhani_600SemiBold';
 const FONT_BOLD = 'Rajdhani_700Bold';
@@ -107,7 +107,7 @@ export default function ProfileScreen({ navigation }) {
     return navigation.addListener('beforeRemove', (e) => {
       if (!dirtyRef.current || Platform.OS === 'web') return;
       e.preventDefault();
-      Alert.alert('Descartar alterações?', 'Você tem alterações que ainda não foram salvas.', [
+      showAlert('Descartar alterações?', 'Você tem alterações que ainda não foram salvas.', [
         { text: 'Continuar editando', style: 'cancel' },
         {
           text: 'Descartar',
@@ -136,7 +136,9 @@ export default function ProfileScreen({ navigation }) {
         update({ photo: result.assets[0].uri });
       }
     } catch (e) {
-      Alert.alert('Erro', 'Não foi possível abrir a galeria.');
+      setShowAvatar(false);
+      showAlert('Erro', 'Não foi possível abrir a galeria.');
+      return;
     }
     setShowAvatar(false);
   }
@@ -151,7 +153,7 @@ export default function ProfileScreen({ navigation }) {
     const clean = { ...draft, name: draft.name.trim() || DEFAULT_PROFILE.name, bio: draft.bio.trim() };
     const ok = await saveProfile(clean);
     if (!ok) {
-      Alert.alert('Erro', 'Não foi possível salvar o perfil.');
+      showAlert('Erro', 'Não foi possível salvar o perfil.');
       return;
     }
     vibrate(40);

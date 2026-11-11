@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Platform,
   Image,
-  Alert,
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +16,7 @@ import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdh
 import { useFonts } from 'expo-font';
 import { TEST_GAMES, TEST_FRIENDS } from '../services/mock';
 import { vibrate } from '../services/settings';
+import { showAlert } from '../components/AppModal';
 
 const FONT_SEMI = 'Rajdhani_600SemiBold';
 const FONT_BOLD = 'Rajdhani_700Bold';
@@ -237,7 +237,7 @@ export default function LobbyScreen({ navigation, route }) {
 
   function leave() {
     if (isHost && Platform.OS !== 'web') {
-      Alert.alert('Fechar sala', 'Como você é o dono, sair fecha a sala para todos.', [
+      showAlert('Fechar sala', 'Como você é o dono, sair fecha a sala para todos.', [
         { text: 'Ficar', style: 'cancel' },
         { text: 'Fechar sala', style: 'destructive', onPress: () => navigation.goBack() },
       ]);

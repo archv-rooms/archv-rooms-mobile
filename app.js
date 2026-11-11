@@ -17,6 +17,7 @@ import SettingsScreen from './src/screens/settings';
 import AboutScreen from './src/screens/about';
 import OnboardingScreen, { ONBOARDING_KEY } from './src/screens/onboarding';
 import BottomTabBar from './src/components/BottomTabBar';
+import { AlertProvider } from './src/components/AppModal';
 import { TOKEN_KEY } from './src/services/api';
 
 const Stack = createNativeStackNavigator();
@@ -50,35 +51,37 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer
-      ref={navigationRef}
-      onReady={updateCurrentRoute}
-      onStateChange={updateCurrentRoute}
-    >
-      <Stack.Navigator
-        initialRouteName="SignIn"
-        screenOptions={{ headerShown: false, animation: 'fade' }}
+    <AlertProvider>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={updateCurrentRoute}
+        onStateChange={updateCurrentRoute}
       >
-        <Stack.Screen name="SignIn" component={SignInScreen} />
-        <Stack.Screen name="SignUp" component={SignUpScreen} />
-        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="Home" component={HomeScreen} />
-        <Stack.Screen name="Game" component={GameScreen} />
-        <Stack.Screen name="Friends" component={FriendsScreen} />
-        <Stack.Screen name="Rooms" component={RoomsScreen} />
-        <Stack.Screen name="Lobby" component={LobbyScreen} />
-        <Stack.Screen name="Chat" component={ChatScreen} />
-        <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="About" component={AboutScreen} />
-      </Stack.Navigator>
+        <Stack.Navigator
+          initialRouteName="SignIn"
+          screenOptions={{ headerShown: false, animation: 'fade' }}
+        >
+          <Stack.Screen name="SignIn" component={SignInScreen} />
+          <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Game" component={GameScreen} />
+          <Stack.Screen name="Friends" component={FriendsScreen} />
+          <Stack.Screen name="Rooms" component={RoomsScreen} />
+          <Stack.Screen name="Lobby" component={LobbyScreen} />
+          <Stack.Screen name="Chat" component={ChatScreen} />
+          <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="About" component={AboutScreen} />
+        </Stack.Navigator>
 
-      <BottomTabBar
-        currentRoute={currentRoute}
-        onNavigate={(name) => navigationRef.navigate(name)}
-        onSignOut={signOut}
-      />
-    </NavigationContainer>
+        <BottomTabBar
+          currentRoute={currentRoute}
+          onNavigate={(name) => navigationRef.navigate(name)}
+          onSignOut={signOut}
+        />
+      </NavigationContainer>
+    </AlertProvider>
   );
 }

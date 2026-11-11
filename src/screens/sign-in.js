@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, Alert, Pressable } from 'react-native';
+import { View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { TOKEN_KEY } from '../services/api';
+import { showAlert } from '../components/AppModal';
 import {
   COLORS,
   FONT,
@@ -38,13 +39,13 @@ export default function SignInScreen({ navigation }) {
       await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
       goHome();
     } catch (e) {
-      Alert.alert('Erro', 'E-mail ou senha incorretos.');
+      showAlert('Erro', 'E-mail ou senha incorretos.');
     }
   }
 
   function handleGithub() {
     // TODO: ligar ao OAuth do GitHub
-    Alert.alert('GitHub', 'Login com GitHub em breve.');
+    showAlert('GitHub', 'Login com GitHub em breve.');
   }
 
   if (!fontsReady) return <View style={{ flex: 1, backgroundColor: COLORS.bgTop }} />;

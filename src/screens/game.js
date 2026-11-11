@@ -8,12 +8,12 @@ import {
   StatusBar,
   ActivityIndicator,
   useWindowDimensions,
-  Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { addSave, getSaveState } from '../services/saves';
 import { useLandscape } from '../hooks/useLandscape';
+import { showAlert } from '../components/AppModal';
 
 // Emulator core used for each console
 const CORES = {
@@ -142,7 +142,7 @@ export default function GameScreen({ navigation, route }) {
 
   function saveGame() {
     if (Platform.OS === 'web') {
-      Alert.alert('Indisponível', 'Salvar só funciona no app do celular.');
+      showAlert('Indisponível', 'Salvar só funciona no app do celular.');
       return;
     }
     if (webRef.current) webRef.current.injectJavaScript(SAVE_JS);
@@ -153,7 +153,7 @@ export default function GameScreen({ navigation, route }) {
       const b64 = await getSaveState(saveId);
       if (b64 && webRef.current) webRef.current.injectJavaScript(buildLoadJs(b64));
     } catch (e) {
-      Alert.alert('Erro', 'Não foi possível carregar o save.');
+      showAlert('Erro', 'Não foi possível carregar o save.');
     }
   }
 
@@ -165,10 +165,10 @@ export default function GameScreen({ navigation, route }) {
       if (saveId) setTimeout(loadSaveIntoGame, 1500);
     } else if (data.startsWith('ejs-state:')) {
       addSave(game, data.slice('ejs-state:'.length))
-        .then(() => Alert.alert('Save criado', 'Veja na aba Saves.'))
-        .catch(() => Alert.alert('Erro', 'Não foi possível guardar o save.'));
+        .then(() => showAlert('Save criado', 'Veja na aba Saves.'))
+        .catch(() => showAlert('Erro', 'Não foi possível guardar o save.'));
     } else if (data.startsWith('ejs-error:')) {
-      Alert.alert('Erro no emulador', data.slice('ejs-error:'.length));
+      showAlert('Erro no emulador', data.slice('ejs-error:'.length));
     }
   }
 
