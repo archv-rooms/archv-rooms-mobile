@@ -1,27 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, Image, ScrollView, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useFonts } from 'expo-font';
-import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
+import { View, Text, Image, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { TOKEN_KEY } from '../services/api';
 import { showAlert } from '../components/AppModal';
-import {
-  COLORS,
-  FONT,
-  FadeIn,
-  PressableScale,
-  AuthField,
-  PrimaryButton,
-  authStyles as s,
-} from '../components/auth-kit';
+import { FadeIn, AuthField, PrimaryButton, authStyles as s } from '../components/auth-kit';
+import AuthLayout from '../components/AuthLayout';
+import PasswordField from '../components/PasswordField';
+import GithubLogin from '../components/GithubLogin';
 
 export default function SignInScreen({ navigation }) {
-  const [fontsReady] = useFonts({ Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold });
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   function goHome() {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
@@ -43,92 +32,46 @@ export default function SignInScreen({ navigation }) {
     }
   }
 
-  function handleGithub() {
-    // TODO: ligar ao OAuth do GitHub
-    showAlert('GitHub', 'Login com GitHub em breve.');
-  }
-
-  if (!fontsReady) return <View style={{ flex: 1, backgroundColor: COLORS.bgTop }} />;
-
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.bgTop }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <FadeIn style={s.header}>
-            <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
-            <Text style={s.title}>Bem-vindo de volta</Text>
-            <Text style={s.subtitle}>Entre para continuar jogando</Text>
-          </FadeIn>
+    <AuthLayout>
+      <FadeIn style={s.header}>
+        <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
+        <Text style={s.title}>Bem-vindo de volta</Text>
+        <Text style={s.subtitle}>Entre para continuar jogando</Text>
+      </FadeIn>
 
-          <FadeIn delay={100}>
-            <AuthField
-              icon="mail-outline"
-              placeholder="E-mail"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
-            <AuthField
-              icon="lock-closed-outline"
-              placeholder="Senha"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              onSubmitEditing={handleLogin}
-              right={
-                <Pressable onPress={() => setShowPassword(!showPassword)} hitSlop={10}>
-                  <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={22} color={COLORS.muted} />
-                </Pressable>
-              }
-            />
+      <FadeIn delay={100}>
+        <AuthField
+          icon="mail-outline"
+          placeholder="E-mail"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+        />
+        <PasswordField value={password} onChangeText={setPassword} onSubmitEditing={handleLogin} />
 
-            <Pressable
-              style={{ alignSelf: 'flex-end', paddingVertical: 4, marginBottom: 18 }}
-              onPress={() => navigation.navigate('ForgotPassword')}
-            >
-              <Text style={s.link}>Esqueceu a senha?</Text>
-            </Pressable>
+        <Pressable
+          style={{ alignSelf: 'flex-end', paddingVertical: 4, marginBottom: 18 }}
+          onPress={() => navigation.navigate('ForgotPassword')}
+        >
+          <Text style={s.link}>Esqueceu a senha?</Text>
+        </Pressable>
 
-            <PrimaryButton label="Entrar" onPress={handleLogin} />
-          </FadeIn>
+        <PrimaryButton label="Entrar" onPress={handleLogin} />
+      </FadeIn>
 
-          <FadeIn delay={200}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 24 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
-              <Text style={s.link}>ou</Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
-            </View>
+      <FadeIn delay={200}>
+        <GithubLogin spacing={24} />
+      </FadeIn>
 
-            <PressableScale
-              onPress={handleGithub}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                height: 54,
-                borderRadius: 27,
-                backgroundColor: COLORS.surface,
-                borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.08)',
-              }}
-              scale={0.96}
-            >
-              <Ionicons name="logo-github" size={20} color="#fff" />
-              <Text style={{ fontFamily: FONT.semi, color: '#fff', fontSize: 18 }}>Continuar com GitHub</Text>
-            </PressableScale>
-          </FadeIn>
+      <View style={{ flex: 1, minHeight: 24 }} />
 
-          <View style={{ flex: 1, minHeight: 24 }} />
-
-          <FadeIn delay={280} style={s.footer}>
-            <Text style={s.footerText}>Não tem conta?</Text>
-            <Pressable onPress={() => navigation.navigate('SignUp')}>
-              <Text style={s.footerLink}>Criar conta</Text>
-            </Pressable>
-          </FadeIn>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+      <FadeIn delay={280} style={s.footer}>
+        <Text style={s.footerText}>Não tem conta?</Text>
+        <Pressable onPress={() => navigation.navigate('SignUp')}>
+          <Text style={s.footerLink}>Criar conta</Text>
+        </Pressable>
+      </FadeIn>
+    </AuthLayout>
   );
 }
