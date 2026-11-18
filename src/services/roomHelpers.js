@@ -1,19 +1,17 @@
-import { TEST_GAMES, TEST_FRIENDS } from './mock';
 import { SOFT, RED, GREEN } from '../constants/palette';
 
-export const GAMES = TEST_GAMES.map((g) => g.title);
-export const FRIEND_USERNAMES = TEST_FRIENDS.map((f) => f.username);
+// Jogos reais carregados da API (preenchido pela tela de Salas)
+let gamesCache = [];
+
+export function setGamesCache(list) {
+  gamesCache = Array.isArray(list) ? list : [];
+}
 
 export function findGame(title) {
-  return TEST_GAMES.find((g) => g.title === title) || null;
+  return gamesCache.find((g) => g.title === title) || null;
 }
 
-export function getCover(name) {
-  const found = findGame(name);
-  return found ? found.image : null;
-}
-
-// Only the status uses color (open, full, joined)
+// Só o status usa cor (aberta, cheia, na sala)
 export function getStatus(joined, full) {
   if (joined) return { label: 'NA SALA', color: SOFT, pulse: false };
   if (full) return { label: 'CHEIA', color: RED, pulse: false };
@@ -21,7 +19,7 @@ export function getStatus(joined, full) {
 }
 
 export function hostLabel(room) {
-  return room.host === 'você' ? 'Sua sala' : 'Sala de ' + room.host;
+  return room.isHost ? 'Sua sala' : 'Sala de ' + room.host;
 }
 
 const ACCENTS = ['#8B7BFF', '#F0649A', '#F5A524', '#2FC4DB', '#4ADE80', '#FB7C3C'];
@@ -29,11 +27,12 @@ const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#
 
 function sumOf(name) {
   let sum = 0;
-  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  const text = String(name || '');
+  for (let i = 0; i < text.length; i++) sum += text.charCodeAt(i);
   return sum;
 }
 
-// Same name always gets the same color
+// O mesmo nome sempre recebe a mesma cor
 export function getAccent(name) {
   return ACCENTS[sumOf(name) % ACCENTS.length];
 }

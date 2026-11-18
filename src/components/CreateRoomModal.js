@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import PressableScale from './PressableScale';
 import Cover from './Cover';
-import { GAMES, getCover } from '../services/roomHelpers';
 import { vibrate } from '../services/settings';
 import {
   FONT_BOLD,
@@ -34,17 +33,19 @@ function TileCheck() {
 }
 
 // Bottom sheet to pick the game and the number of players
-export default function CreateRoomModal({ visible, onClose, onConfirm }) {
-  const [selectedGame, setSelectedGame] = useState(GAMES[0]);
+export default function CreateRoomModal({ visible, games = [], onClose, onConfirm }) {
+  const [selectedId, setSelectedId] = useState(null);
   const [selectedMax, setSelectedMax] = useState(2);
 
   // Reset the choices every time the modal opens
   useEffect(() => {
     if (visible) {
-      setSelectedGame(GAMES[0]);
+      setSelectedId(games[0] ? games[0].id : null);
       setSelectedMax(2);
     }
   }, [visible]);
+
+  const selectedGame = games.find((g) => g.id === selectedId) || null;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -54,35 +55,39 @@ export default function CreateRoomModal({ visible, onClose, onConfirm }) {
           <Text style={styles.modalTitle}>Criar sala</Text>
 
           <Text style={styles.modalLabel}>JOGO</Text>
-          <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-            <View style={styles.grid}>
-              {GAMES.map((g) => {
-                const active = g === selectedGame;
-                return (
-                  <PressableScale
-                    key={g}
-                    wrapStyle={styles.tileWrap}
-                    onPress={() => {
-                      vibrate(15);
-                      setSelectedGame(g);
-                    }}
-                    style={[styles.tile, active && styles.tileActive]}
-                    scale={0.95}
-                  >
-                    <Cover uri={getCover(g)} iconSize={30} style={StyleSheet.absoluteFill} />
-                    <LinearGradient
-                      colors={['transparent', 'rgba(20,17,31,0.92)']}
-                      locations={[0.25, 1]}
-                      style={StyleSheet.absoluteFill}
-                      pointerEvents="none"
-                    />
-                    {active && <TileCheck />}
-                    <Text style={styles.tileText} numberOfLines={2}>{g}</Text>
-                  </PressableScale>
-                );
-              })}
-            </View>
-          </ScrollView>
+          {games.length === 0 ? (
+            <Text style={styles.emptyGames}>Nenhum jogo disponível. Puxe a lista para atualizar.</Text>
+          ) : (
+            <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.grid}>
+                {games.map((g) => {
+                  const active = g.id === selectedId;
+                  return (
+                    <PressableScale
+                      key={g.id}
+                      wrapStyle={styles.tileWrap}
+                      onPress={() => {
+                        vibrate(15);
+                        setSelectedId(g.id);
+                      }}
+                      style={[styles.tile, active && styles.tileActive]}
+                      scale={0.95}
+                    >
+                      <Cover uri={g.image} iconSize={30} style={StyleSheet.absoluteFill} />
+                      <LinearGradient
+                        colors={['transparent', 'rgba(20,17,31,0.92)']}
+                        locations={[0.25, 1]}
+                        style={StyleSheet.absoluteFill}
+                        pointerEvents="none"
+                      />
+                      {active && <TileCheck />}
+                      <Text style={styles.tileText} numberOfLines={2}>{g.title}</Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          )}
 
           <Text style={styles.modalLabel}>JOGADORES</Text>
           <View style={styles.maxRow}>
@@ -111,8 +116,8 @@ export default function CreateRoomModal({ visible, onClose, onConfirm }) {
             </PressableScale>
             <PressableScale
               wrapStyle={{ flex: 1 }}
-              onPress={() => onConfirm(selectedGame, selectedMax)}
-              style={styles.confirmButton}
+              onPress={() => selectedGame && onConfirm(selectedGame, selectedMax)}
+              style={[styles.confirmButton, !selectedGame && { opacity: 0.4 }]}
               scale={0.96}
             >
               <Text style={styles.modalButtonText}>Criar</Text>
@@ -151,6 +156,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 8,
   },
+  emptyGames: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 14, paddingVertical: 12 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   tileWrap: { width: '48.5%', marginBottom: 10 },

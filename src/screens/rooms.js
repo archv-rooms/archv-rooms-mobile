@@ -14,10 +14,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-import { MOCK_ROOMS } from '../services/mock';
+import api from '../services/api';
 import { vibrate } from '../services/settings';
-import { takeLobbyLeave } from '../services/lobbyLeave';
-import { FRIEND_USERNAMES, getCover, getStatus, hostLabel } from '../services/roomHelpers';
+import { setGamesCache, getStatus, hostLabel } from '../services/roomHelpers';
+import { showAlert } from '../components/AppModal';
 import PressableScale from '../components/PressableScale';
 import FadeIn from '../components/FadeIn';
 import Cover from '../components/Cover';
@@ -54,6 +54,20 @@ const SECTION_TITLE = {
   friends: 'Salas de amigos',
 };
 
+function extractList(res, key) {
+  const body = res && res.data;
+  if (Array.isArray(body)) return body;
+  if (body && Array.isArray(body.data)) return body.data;
+  if (body && body.data && Array.isArray(body.data[key])) return body.data[key];
+  return [];
+}
+
+function errorMessage(e, fallback) {
+  const status = e && e.response && e.response.status;
+  if (status === 401) return 'Entre com uma conta para usar as salas.';
+  return (e && e.response && e.response.data && e.response.data.message) || fallback;
+}
+
 function EmptyState({ onCreate }) {
   const float = useFloat(6, 1600);
   return (
@@ -72,14 +86,15 @@ function EmptyState({ onCreate }) {
 
 export default function RoomsScreen({ route, navigation }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
-  const [rooms, setRooms] = useState(MOCK_ROOMS);
-  const [joinedIds, setJoinedIds] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [games, setGames] = useState([]);
   const [notice, setNotice] = useState('');
   const [filter, setFilter] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
   const [carouselW, setCarouselW] = useState(Dimensions.get('window').width - 40);
   const [tabsWidth, setTabsWidth] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [animKey, setAnimKey] = useState(0);
 
   const carouselRef = useRef(null);
@@ -89,44 +104,48 @@ export default function RoomsScreen({ route, navigation }) {
   const inviteName = route?.params?.invite;
   const inviteTs = route?.params?.ts;
 
-  // Chegou um convite vindo da tela de Amigos: cria a sala, avisa e abre o lobby
+  async function loadRooms() {
+    try {
+      const res = await api.get('/rooms');
+      setRooms(extractList(res, 'rooms'));
+    } catch (e) {
+      showAlert('Erro', errorMessage(e, 'Não foi possível carregar as salas.'));
+    }
+  }
+
+  async function loadGames() {
+    try {
+      const res = await api.get('/games');
+      const list = extractList(res, 'games').filter((g) => g && g.fileUrl);
+      setGames(list);
+      setGamesCache(list);
+    } catch (e) {}
+  }
+
+  // Atualiza sempre que a tela volta ao foco (inclui voltar do lobby)
+  useFocusEffect(
+    useCallback(() => {
+      loadRooms();
+      loadGames();
+    }, [])
+  );
+
+  // Convite vindo da tela de Amigos: abre a criação de sala
   useEffect(() => {
     if (!inviteName) return undefined;
-    const room = {
-      id: 'r' + Date.now(),
-      game: 'Street Fighter II',
-      host: 'você',
-      players: 1,
-      maxPlayers: 2,
-    };
-    setRooms((list) => [room, ...list]);
-    setJoinedIds((list) => [...list, room.id]);
-    setNotice('Convite enviado para ' + inviteName);
-    vibrate(40);
-    navigation.navigate('Lobby', { room, invited: inviteName });
+    setNotice('Crie uma sala para convidar ' + inviteName);
+    setShowCreate(true);
     const timer = setTimeout(() => setNotice(''), 3500);
     return () => clearTimeout(timer);
   }, [inviteName, inviteTs]);
 
-  // Voltou do lobby: atualiza a lista (sala fechada ou vaga liberada)
-  useFocusEffect(
-    useCallback(() => {
-      const left = takeLobbyLeave();
-      if (!left) return;
-      if (left.closed) {
-        setRooms((list) => list.filter((r) => r.id !== left.id));
-      } else {
-        setRooms((list) => list.map((r) => (r.id === left.id ? { ...r, players: left.players } : r)));
-      }
-      setJoinedIds((list) => list.filter((j) => j !== left.id));
-    }, [])
-  );
+  const joinedCount = rooms.filter((r) => r.joined).length;
 
   // Quando entra/sai de uma sala, o carrossel volta pro primeiro destaque
   useEffect(() => {
     const node = carouselRef.current;
     if (node && node.scrollTo) node.scrollTo({ x: 0, animated: false });
-  }, [joinedIds.length]);
+  }, [joinedCount]);
 
   // A pílula do filtro desliza
   const filterIndex = FILTERS.findIndex((f) => f.key === filter);
@@ -144,44 +163,54 @@ export default function RoomsScreen({ route, navigation }) {
     setShowCreate(true);
   }
 
-  // Cria a sala e abre o lobby como dono
-  function confirmCreate(game, maxPlayers) {
+  // Cria a sala na API e abre o lobby como dono
+  async function confirmCreate(game, maxPlayers) {
+    if (busy) return;
+    setBusy(true);
     vibrate(30);
-    const room = {
-      id: 'r' + Date.now(),
-      game,
-      host: 'você',
-      players: 1,
-      maxPlayers,
-    };
-    setRooms([room, ...rooms]);
-    setJoinedIds([...joinedIds, room.id]);
-    setShowCreate(false);
-    navigation.navigate('Lobby', { room });
+    try {
+      const res = await api.post('/rooms', { gameId: game.id, maxPlayers });
+      const room = res.data && res.data.data && res.data.data.room;
+      setShowCreate(false);
+      if (room) navigation.navigate('Lobby', { room, invited: inviteName });
+      loadRooms();
+    } catch (e) {
+      showAlert('Erro', errorMessage(e, 'Não foi possível criar a sala.'));
+    }
+    setBusy(false);
   }
 
   // Entra na sala e abre o lobby
-  function joinRoom(id) {
+  async function joinRoom(id) {
     const room = rooms.find((r) => r.id === id);
-    if (!room || room.players >= room.maxPlayers) return;
+    if (!room || busy) return;
+    if (!room.joined && room.players >= room.maxPlayers) return;
+    setBusy(true);
     vibrate(30);
-    const updated = { ...room, players: room.players + 1 };
-    setRooms(rooms.map((r) => (r.id === id ? updated : r)));
-    setJoinedIds([...joinedIds, id]);
-    navigation.navigate('Lobby', { room: updated });
+    try {
+      const res = await api.post('/rooms/' + id + '/join');
+      const updated = res.data && res.data.data && res.data.data.room;
+      if (updated) navigation.navigate('Lobby', { room: updated });
+      loadRooms();
+    } catch (e) {
+      showAlert('Erro', errorMessage(e, 'Não foi possível entrar na sala.'));
+      loadRooms();
+    }
+    setBusy(false);
   }
 
   // Sair: se a sala é sua, ela é fechada; senão só libera a vaga
-  function leaveRoom(id) {
+  async function leaveRoom(id) {
+    if (busy) return;
+    setBusy(true);
     vibrate(30);
-    const room = rooms.find((r) => r.id === id);
-    if (!room) return;
-    if (room.host === 'você') {
-      setRooms(rooms.filter((r) => r.id !== id));
-    } else {
-      setRooms(rooms.map((r) => (r.id === id ? { ...r, players: Math.max(1, r.players - 1) } : r)));
+    try {
+      await api.post('/rooms/' + id + '/leave');
+    } catch (e) {
+      showAlert('Erro', errorMessage(e, 'Não foi possível sair da sala.'));
     }
-    setJoinedIds(joinedIds.filter((j) => j !== id));
+    await loadRooms();
+    setBusy(false);
   }
 
   function changeFilter(key) {
@@ -190,28 +219,26 @@ export default function RoomsScreen({ route, navigation }) {
     setFilter(key);
   }
 
-  // Puxar para atualizar (por enquanto simulado; troque pelo fetch real quando tiver API)
-  function onRefresh() {
+  async function onRefresh() {
     setRefreshing(true);
     vibrate(20);
-    setTimeout(() => {
-      setAnimKey((k) => k + 1);
-      setRefreshing(false);
-    }, 900);
+    await Promise.all([loadRooms(), loadGames()]);
+    setAnimKey((k) => k + 1);
+    setRefreshing(false);
   }
 
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
 
-  // ---------- Destaques (até 3): sua sala, salas de amigos com vaga, salas mais cheias ----------
+  // ---------- Destaques (até 3): sua sala, salas com vaga, salas mais cheias ----------
   const isOpen = (r) => r.players < r.maxPlayers;
-  const isFriend = (r) => FRIEND_USERNAMES.includes(r.host);
+  // O filtro "Amigos" será ligado à lista de amigos reais em uma próxima etapa
+  const isFriend = () => false;
 
   const featuredList = [];
   const addFeatured = (r) => {
     if (r && featuredList.length < 3 && !featuredList.some((f) => f.id === r.id)) featuredList.push(r);
   };
-  rooms.filter((r) => joinedIds.includes(r.id)).forEach(addFeatured);
-  rooms.filter((r) => isFriend(r) && isOpen(r)).forEach(addFeatured);
+  rooms.filter((r) => r.joined).forEach(addFeatured);
   rooms
     .filter(isOpen)
     .sort((a, b) => b.players / b.maxPlayers - a.players / a.maxPlayers)
@@ -237,7 +264,7 @@ export default function RoomsScreen({ route, navigation }) {
   });
 
   function renderFeatured(room, i) {
-    const joined = joinedIds.includes(room.id);
+    const joined = !!room.joined;
     const full = room.players >= room.maxPlayers;
     const status = getStatus(joined, full);
 
@@ -249,7 +276,7 @@ export default function RoomsScreen({ route, navigation }) {
       <View key={room.id} style={{ width: carouselW }}>
         <Animated.View style={{ opacity: cardOpacity, transform: [{ scale: cardScale }] }}>
           <View style={styles.featured}>
-            <Cover uri={getCover(room.game)} iconSize={56} zoom style={StyleSheet.absoluteFill} />
+            <Cover uri={room.image} iconSize={56} zoom style={StyleSheet.absoluteFill} />
             <LinearGradient
               colors={['rgba(20,17,31,0.6)', 'transparent', 'rgba(20,17,31,0.95)']}
               locations={[0, 0.45, 1]}
@@ -414,14 +441,14 @@ export default function RoomsScreen({ route, navigation }) {
           </View>
 
           {list.map((room, index) => {
-            const joined = joinedIds.includes(room.id);
+            const joined = !!room.joined;
             const full = room.players >= room.maxPlayers;
             const status = getStatus(joined, full);
 
             return (
               <FadeIn key={filter + '-' + animKey + '-' + room.id} delay={Math.min(index, 8) * 60}>
                 <View style={styles.row}>
-                  <Cover uri={getCover(room.game)} style={styles.thumb} iconSize={22} />
+                  <Cover uri={room.image} style={styles.thumb} iconSize={22} />
 
                   <View style={styles.rowInfo}>
                     <Text style={styles.rowGame} numberOfLines={1}>{room.game}</Text>
@@ -460,6 +487,7 @@ export default function RoomsScreen({ route, navigation }) {
 
         <CreateRoomModal
           visible={showCreate}
+          games={games}
           onClose={() => setShowCreate(false)}
           onConfirm={confirmCreate}
         />
