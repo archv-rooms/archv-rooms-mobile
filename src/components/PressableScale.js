@@ -4,7 +4,7 @@ import { Animated, Pressable, Platform } from 'react-native';
 const NATIVE = Platform.OS !== 'web';
 
 // Button that shrinks when pressed and springs back
-export default function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93 }) {
+export default function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93, disabled }) {
   const value = useRef(new Animated.Value(1)).current;
 
   function pressIn() {
@@ -16,7 +16,13 @@ export default function PressableScale({ onPress, wrapStyle, style, children, sc
   }
 
   return (
-    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} style={wrapStyle}>
+    <Pressable
+      onPress={onPress}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
+      disabled={disabled}
+      style={wrapStyle}
+    >
       <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
     </Pressable>
   );

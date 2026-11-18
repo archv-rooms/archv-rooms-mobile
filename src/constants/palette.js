@@ -33,3 +33,9 @@ export const CONSOLE_COLORS = {
 export function consoleColor(name) {
   return CONSOLE_COLORS[(name || '').toUpperCase()] || ACCENT;
 }
+
+// Extra colors (rooms, lobby and auth screens)
+export const SOFT = '#C4BAFF';
+export const GREEN = '#4ADE80';
+export const RED = '#FF8A9B';
+export const AMBER = '#F5A524';

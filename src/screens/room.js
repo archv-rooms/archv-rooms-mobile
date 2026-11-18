@@ -7,63 +7,35 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
-  Image,
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-import { TEST_GAMES, TEST_FRIENDS } from '../services/mock';
 import { vibrate } from '../services/settings';
+import { setLobbyLeave } from '../services/lobbyLeave';
+import { FRIEND_USERNAMES, findGame, getAccent, avatarColor } from '../services/roomHelpers';
 import { showAlert } from '../components/AppModal';
-
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
-
-const BG_TOP = '#14111F';
-const BG_BOTTOM = '#221B38';
-const SURFACE = '#2D2545';
-const SURFACE_LIGHT = '#3A3058';
-const ACCENT = '#8E7CF0';
-const BUTTON_PURPLE = '#6A5BD6';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
-const GREEN = '#4ADE80';
-const RED = '#FF8A9B';
-const AMBER = '#F5A524';
-
-const ACCENTS = ['#8B7BFF', '#F0649A', '#F5A524', '#2FC4DB', '#4ADE80', '#FB7C3C'];
-const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#C77CFF', '#FF4D4D'];
-const FRIEND_USERNAMES = TEST_FRIENDS.map((f) => f.username);
+import Cover from '../components/Cover';
+import MemberRow, { EmptySlot } from '../components/MemberRow';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  SURFACE_LIGHT,
+  ACCENT,
+  BUTTON_PURPLE,
+  WHITE,
+  TEXT_MUTED,
+  GREEN,
+  RED,
+  AMBER,
+} from '../constants/palette';
 
 const BOT_REPLIES = ['Bora!', 'Já tô pronto', 'Hahaha boa', 'Show, vamos nessa', 'Me espera 1 minuto'];
-
-function sumOf(name) {
-  let sum = 0;
-  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
-  return sum;
-}
-
-function getAccent(name) {
-  return ACCENTS[sumOf(name) % ACCENTS.length];
-}
-
-function avatarColor(name) {
-  return AVATAR_COLORS[sumOf(name) % AVATAR_COLORS.length];
-}
-
-function getGame(title) {
-  return TEST_GAMES.find((g) => g.title === title) || null;
-}
-
-// A tela de Salas lê isto quando volta do lobby, para atualizar a lista
-let pendingLeave = null;
-export function takeLobbyLeave() {
-  const value = pendingLeave;
-  pendingLeave = null;
-  return value;
-}
 
 // Jogadores que já estão na sala quando você entra
 function buildInitialMembers(room, isHost) {
@@ -78,63 +50,13 @@ function buildInitialMembers(room, isHost) {
   return list;
 }
 
-// Capa com fallback caso a imagem não carregue
-function Cover({ uri, accent, style }) {
-  const [failed, setFailed] = useState(false);
-  if (!uri || failed) {
-    return (
-      <LinearGradient
-        colors={[accent + '99', SURFACE]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[style, { alignItems: 'center', justifyContent: 'center' }]}
-      >
-        <Ionicons name="game-controller" size={56} color={WHITE} style={{ opacity: 0.5 }} />
-      </LinearGradient>
-    );
-  }
-  return <Image source={{ uri }} style={style} resizeMode="cover" onError={() => setFailed(true)} />;
-}
-
-function MemberRow({ member }) {
-  const color = avatarColor(member.name);
-  let badge = { label: 'ESPERANDO', color: TEXT_MUTED, bg: 'rgba(255,255,255,0.08)' };
-  if (member.isHost) badge = { label: 'DONO', color: '#C4BAFF', bg: 'rgba(142,124,240,0.2)' };
-  else if (member.ready) badge = { label: 'PRONTO', color: GREEN, bg: 'rgba(74,222,128,0.14)' };
-
-  return (
-    <View style={styles.member}>
-      <View style={[styles.avatar, { backgroundColor: color + '30', borderColor: color }]}>
-        <Text style={[styles.avatarText, { color }]}>{member.name.trim().charAt(0).toUpperCase()}</Text>
-      </View>
-      <Text style={styles.memberName} numberOfLines={1}>
-        {member.isMe ? 'você' : member.name}
-      </Text>
-      <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-        <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
-      </View>
-    </View>
-  );
-}
-
-function EmptySlot() {
-  return (
-    <View style={[styles.member, styles.memberEmpty]}>
-      <View style={[styles.avatar, styles.avatarEmpty]}>
-        <Ionicons name="person-add-outline" size={16} color={TEXT_MUTED} />
-      </View>
-      <Text style={styles.waitingText}>Aguardando jogador...</Text>
-    </View>
-  );
-}
-
 export default function LobbyScreen({ navigation, route }) {
   const { room, invited } = route.params;
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
 
   const isHost = room.host === 'você';
   const accent = getAccent(room.game);
-  const game = getGame(room.game);
+  const game = findGame(room.game);
 
   const [members, setMembers] = useState(() => buildInitialMembers(room, isHost));
   const [messages, setMessages] = useState([{ id: 'sys-0', system: true, text: 'Você entrou na sala' }]);
@@ -165,7 +87,7 @@ export default function LobbyScreen({ navigation, route }) {
   // Ao sair da sala (botão, seta ou botão voltar do Android), avisa a tela de Salas
   useEffect(() => {
     return navigation.addListener('beforeRemove', () => {
-      pendingLeave = { id: room.id, closed: isHost, players: Math.max(1, room.players - 1) };
+      setLobbyLeave({ id: room.id, closed: isHost, players: Math.max(1, room.players - 1) });
     });
   }, []);
 
@@ -298,7 +220,12 @@ export default function LobbyScreen({ navigation, route }) {
         >
           {/* ---------- Capa ---------- */}
           <View style={[styles.hero, { borderColor: accent + '66' }]}>
-            <Cover uri={game ? game.image : null} accent={accent} style={StyleSheet.absoluteFill} />
+            <Cover
+              uri={game ? game.image : null}
+              accent={accent}
+              iconSize={56}
+              style={StyleSheet.absoluteFill}
+            />
             <LinearGradient
               colors={['rgba(20,17,31,0.55)', 'transparent', 'rgba(20,17,31,0.94)']}
               locations={[0, 0.4, 1]}
@@ -472,34 +399,6 @@ const styles = StyleSheet.create({
   },
   section: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 14, letterSpacing: 1.5 },
   sectionCount: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 14 },
-
-  member: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: SURFACE,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 12,
-    height: 56,
-    marginBottom: 8,
-  },
-  memberEmpty: { backgroundColor: 'transparent', borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.15)' },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEmpty: { borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1.5, backgroundColor: 'transparent' },
-  avatarText: { fontFamily: FONT_BOLD, fontSize: 17 },
-  memberName: { flex: 1, fontFamily: FONT_BOLD, color: WHITE, fontSize: 18 },
-  waitingText: { flex: 1, fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 16 },
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
-  badgeText: { fontFamily: FONT_BOLD, fontSize: 11, letterSpacing: 1 },
 
   chat: {
     backgroundColor: 'rgba(255,255,255,0.05)',

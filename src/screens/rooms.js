@@ -4,13 +4,9 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  Pressable,
   Platform,
-  Modal,
-  Image,
   Dimensions,
   Animated,
-  Easing,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,28 +14,33 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-import { MOCK_ROOMS, TEST_GAMES, TEST_FRIENDS } from '../services/mock';
+import { MOCK_ROOMS } from '../services/mock';
 import { vibrate } from '../services/settings';
-import { takeLobbyLeave } from './room';
+import { takeLobbyLeave } from '../services/lobbyLeave';
+import { FRIEND_USERNAMES, getCover, getStatus, hostLabel } from '../services/roomHelpers';
+import PressableScale from '../components/PressableScale';
+import FadeIn from '../components/FadeIn';
+import Cover from '../components/Cover';
+import LiveDot from '../components/LiveDot';
+import RoomAvatars from '../components/RoomAvatars';
+import JoinButton from '../components/JoinButton';
+import CreateRoomModal from '../components/CreateRoomModal';
+import useFloat from '../hooks/useFloat';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  SURFACE_LIGHT,
+  ACCENT,
+  BUTTON_PURPLE,
+  WHITE,
+  TEXT_MUTED,
+  GREEN,
+} from '../constants/palette';
 
 const NATIVE = Platform.OS !== 'web';
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
-
-const BG_TOP = '#14111F';
-const BG_BOTTOM = '#221B38';
-const SURFACE = '#2D2545';
-const SURFACE_LIGHT = '#3A3058';
-const ACCENT = '#8E7CF0';
-const BUTTON_PURPLE = '#6A5BD6';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
-const SOFT = '#C4BAFF';
-const GREEN = '#4ADE80';
-const RED = '#FF8A9B';
-
-const GAMES = TEST_GAMES.map((g) => g.title);
-const FRIEND_USERNAMES = TEST_FRIENDS.map((f) => f.username);
 
 const FILTERS = [
   { key: 'all', label: 'Todas' },
@@ -52,240 +53,6 @@ const SECTION_TITLE = {
   open: 'Salas abertas',
   friends: 'Salas de amigos',
 };
-
-function getCover(name) {
-  const found = TEST_GAMES.find((g) => g.title === name);
-  return found ? found.image : null;
-}
-
-// Só o estado usa cor (aberta, cheia, na sala). Os jogos não têm mais cor própria.
-function getStatus(joined, full) {
-  if (joined) return { label: 'NA SALA', color: SOFT, pulse: false };
-  if (full) return { label: 'CHEIA', color: RED, pulse: false };
-  return { label: 'ABERTA', color: GREEN, pulse: true };
-}
-
-function hostLabel(room) {
-  return room.host === 'você' ? 'Sua sala' : 'Sala de ' + room.host;
-}
-
-// ---------- Animações reutilizáveis ----------
-
-// Botão que encolhe ao tocar e volta com mola
-function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93 }) {
-  const value = useRef(new Animated.Value(1)).current;
-
-  function pressIn() {
-    Animated.spring(value, { toValue: scale, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start();
-  }
-
-  function pressOut() {
-    Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 18, bounciness: 14 }).start();
-  }
-
-  return (
-    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} style={wrapStyle}>
-      <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
-    </Pressable>
-  );
-}
-
-// Aparece com fade e sobe com mola, com atraso opcional
-function FadeIn({ delay = 0, style, children }) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
-      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 70, friction: 10 }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
-          transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
-        },
-      ]}
-    >
-      {children}
-    </Animated.View>
-  );
-}
-
-// Valor que sobe e desce devagar
-function useFloat(amplitude, duration) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(value, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
-        Animated.timing(value, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  return value.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
-}
-
-// Bolinha de status; quando pulse é true, ganha um anel que expande
-function LiveDot({ color, size = 7, pulse = false }) {
-  const anim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!pulse) return undefined;
-    const loop = Animated.loop(
-      Animated.timing(anim, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: NATIVE })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      {pulse && (
-        <Animated.View
-          style={{
-            position: 'absolute',
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            backgroundColor: color,
-            opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] }),
-            transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.8] }) }],
-          }}
-        />
-      )}
-      <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />
-    </View>
-  );
-}
-
-// Capa com fallback neutro; com zoom, a imagem "respira" devagar
-function Cover({ uri, style, iconSize = 28, zoom = false }) {
-  const [failed, setFailed] = useState(false);
-  const scale = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!zoom) return undefined;
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(scale, { toValue: 1, duration: 9000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
-        Animated.timing(scale, { toValue: 0, duration: 9000, easing: Easing.inOut(Easing.sin), useNativeDriver: NATIVE }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [zoom]);
-
-  if (!uri || failed) {
-    return (
-      <LinearGradient
-        colors={[SURFACE_LIGHT, SURFACE]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[style, { alignItems: 'center', justifyContent: 'center' }]}
-      >
-        <Ionicons name="game-controller" size={iconSize} color={WHITE} style={{ opacity: 0.35 }} />
-      </LinearGradient>
-    );
-  }
-
-  if (!zoom) {
-    return <Image source={{ uri }} style={style} resizeMode="cover" onError={() => setFailed(true)} />;
-  }
-
-  return (
-    <Animated.View
-      style={[style, { transform: [{ scale: scale.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] }) }] }]}
-    >
-      <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" onError={() => setFailed(true)} />
-    </Animated.View>
-  );
-}
-
-// ---------- Peças da tela ----------
-
-// Avatares sobrepostos (o primeiro é o anfitrião)
-function Avatars({ room, size = 26 }) {
-  const hostInitial = (room.host || '?').charAt(0).toUpperCase();
-  return (
-    <View style={{ flexDirection: 'row' }}>
-      {Array.from({ length: room.maxPlayers }).map((_, i) => {
-        const filled = i < room.players;
-        return (
-          <View
-            key={i}
-            style={[
-              styles.avatar,
-              { width: size, height: size, borderRadius: size / 2 },
-              i > 0 && { marginLeft: -8 },
-              filled ? (i === 0 ? styles.avatarHost : styles.avatarFilled) : styles.avatarEmpty,
-            ]}
-          >
-            {filled &&
-              (i === 0 ? (
-                <Text style={styles.avatarText}>{hostInitial}</Text>
-              ) : (
-                <Ionicons name="person" size={size * 0.45} color={WHITE} />
-              ))}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-// Botão Entrar / Sair / Cheia. compact vira um botão redondo só com ícone
-function JoinButton({ joined, full, onJoin, onLeave, compact }) {
-  if (joined) {
-    return (
-      <PressableScale
-        onPress={onLeave}
-        style={[compact ? styles.iconButton : styles.joinButton, styles.leaveButton]}
-      >
-        <Ionicons name="exit-outline" size={compact ? 20 : 16} color={RED} />
-        {!compact && <Text style={[styles.joinText, { color: RED }]}>Sair</Text>}
-      </PressableScale>
-    );
-  }
-  return (
-    <PressableScale
-      onPress={full ? undefined : onJoin}
-      style={[
-        compact ? styles.iconButton : styles.joinButton,
-        full ? styles.buttonOff : styles.buttonOn,
-      ]}
-    >
-      <Ionicons
-        name={full ? 'lock-closed' : 'play'}
-        size={compact ? 18 : 14}
-        color={full ? TEXT_MUTED : WHITE}
-        style={!full && compact ? { marginLeft: 2 } : null}
-      />
-      {!compact && <Text style={[styles.joinText, full && { color: TEXT_MUTED }]}>{full ? 'Cheia' : 'Entrar'}</Text>}
-    </PressableScale>
-  );
-}
-
-// Selo de marcado no modal, aparece com um "pop"
-function TileCheck() {
-  const scale = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: NATIVE, speed: 16, bounciness: 18 }).start();
-  }, []);
-  return (
-    <Animated.View style={[styles.tileCheck, { transform: [{ scale }] }]}>
-      <Ionicons name="checkmark" size={14} color={WHITE} />
-    </Animated.View>
-  );
-}
 
 function EmptyState({ onCreate }) {
   const float = useFloat(6, 1600);
@@ -310,8 +77,6 @@ export default function RoomsScreen({ route, navigation }) {
   const [notice, setNotice] = useState('');
   const [filter, setFilter] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
-  const [selectedGame, setSelectedGame] = useState(GAMES[0]);
-  const [selectedMax, setSelectedMax] = useState(2);
   const [carouselW, setCarouselW] = useState(Dimensions.get('window').width - 40);
   const [tabsWidth, setTabsWidth] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -376,20 +141,18 @@ export default function RoomsScreen({ route, navigation }) {
 
   function openCreate() {
     vibrate(30);
-    setSelectedGame(GAMES[0]);
-    setSelectedMax(2);
     setShowCreate(true);
   }
 
   // Cria a sala e abre o lobby como dono
-  function confirmCreate() {
+  function confirmCreate(game, maxPlayers) {
     vibrate(30);
     const room = {
       id: 'r' + Date.now(),
-      game: selectedGame,
+      game,
       host: 'você',
       players: 1,
-      maxPlayers: selectedMax,
+      maxPlayers,
     };
     setRooms([room, ...rooms]);
     setJoinedIds([...joinedIds, room.id]);
@@ -505,7 +268,7 @@ export default function RoomsScreen({ route, navigation }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sub} numberOfLines={1}>{hostLabel(room)}</Text>
                   <View style={styles.avatarsWrap}>
-                    <Avatars room={room} size={26} />
+                    <RoomAvatars room={room} size={26} />
                     <Text style={styles.count}>
                       {room.players}/{room.maxPlayers}
                     </Text>
@@ -695,76 +458,11 @@ export default function RoomsScreen({ route, navigation }) {
           {list.length === 0 && <EmptyState onCreate={openCreate} />}
         </ScrollView>
 
-        {/* ---------- Modal criar sala ---------- */}
-        <Modal visible={showCreate} transparent animationType="slide" onRequestClose={() => setShowCreate(false)}>
-          <View style={styles.modalBackdrop}>
-            <View style={styles.modalCard}>
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Criar sala</Text>
-
-              <Text style={styles.modalLabel}>JOGO</Text>
-              <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-                <View style={styles.grid}>
-                  {GAMES.map((g) => {
-                    const active = g === selectedGame;
-                    return (
-                      <PressableScale
-                        key={g}
-                        wrapStyle={styles.tileWrap}
-                        onPress={() => {
-                          vibrate(15);
-                          setSelectedGame(g);
-                        }}
-                        style={[styles.tile, active && styles.tileActive]}
-                        scale={0.95}
-                      >
-                        <Cover uri={getCover(g)} iconSize={30} style={StyleSheet.absoluteFill} />
-                        <LinearGradient
-                          colors={['transparent', 'rgba(20,17,31,0.92)']}
-                          locations={[0.25, 1]}
-                          style={StyleSheet.absoluteFill}
-                          pointerEvents="none"
-                        />
-                        {active && <TileCheck />}
-                        <Text style={styles.tileText} numberOfLines={2}>{g}</Text>
-                      </PressableScale>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-
-              <Text style={styles.modalLabel}>JOGADORES</Text>
-              <View style={styles.maxRow}>
-                {[2, 3, 4].map((n) => {
-                  const active = n === selectedMax;
-                  return (
-                    <PressableScale
-                      key={n}
-                      wrapStyle={{ flex: 1 }}
-                      onPress={() => {
-                        vibrate(15);
-                        setSelectedMax(n);
-                      }}
-                      style={[styles.maxChip, active && styles.maxChipActive]}
-                      scale={0.92}
-                    >
-                      <Text style={[styles.optionText, active && { color: WHITE }]}>{n}</Text>
-                    </PressableScale>
-                  );
-                })}
-              </View>
-
-              <View style={styles.modalActions}>
-                <PressableScale onPress={() => setShowCreate(false)} style={styles.cancelButton} scale={0.95}>
-                  <Text style={styles.modalButtonText}>Cancelar</Text>
-                </PressableScale>
-                <PressableScale wrapStyle={{ flex: 1 }} onPress={confirmCreate} style={styles.confirmButton} scale={0.96}>
-                  <Text style={styles.modalButtonText}>Criar</Text>
-                </PressableScale>
-              </View>
-            </View>
-          </View>
-        </Modal>
+        <CreateRoomModal
+          visible={showCreate}
+          onClose={() => setShowCreate(false)}
+          onConfirm={confirmCreate}
+        />
       </View>
     </LinearGradient>
   );
@@ -969,128 +667,4 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginTop: 4,
   },
-
-  // ---------- Avatares ----------
-  avatar: {
-    borderWidth: 2,
-    borderColor: '#1B1630',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarHost: { backgroundColor: BUTTON_PURPLE },
-  avatarFilled: { backgroundColor: SURFACE_LIGHT },
-  avatarEmpty: { backgroundColor: 'rgba(255,255,255,0.08)' },
-  avatarText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 12 },
-
-  // ---------- Botões entrar / sair ----------
-  joinButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonOn: { backgroundColor: BUTTON_PURPLE },
-  buttonOff: { backgroundColor: 'rgba(255,255,255,0.08)' },
-  leaveButton: {
-    backgroundColor: 'rgba(255,138,155,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,138,155,0.4)',
-  },
-  joinText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 15 },
-
-  // ---------- Modal ----------
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalCard: {
-    backgroundColor: BG_BOTTOM,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
-  },
-  modalHandle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginBottom: 14,
-  },
-  modalTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 24, marginBottom: 4 },
-  modalLabel: {
-    fontFamily: FONT_BOLD,
-    color: TEXT_MUTED,
-    fontSize: 13,
-    letterSpacing: 1.5,
-    marginTop: 14,
-    marginBottom: 8,
-  },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  tileWrap: { width: '48.5%', marginBottom: 10 },
-  tile: {
-    height: 92,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-    backgroundColor: SURFACE,
-  },
-  tileActive: { borderColor: ACCENT },
-  tileText: {
-    fontFamily: FONT_BOLD,
-    color: WHITE,
-    fontSize: 15,
-    lineHeight: 17,
-    paddingHorizontal: 10,
-    paddingBottom: 8,
-  },
-  tileCheck: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: BUTTON_PURPLE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  optionText: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 16 },
-  maxRow: { flexDirection: 'row', gap: 10 },
-  maxChip: {
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: SURFACE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  maxChipActive: { backgroundColor: BUTTON_PURPLE },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 22 },
-  cancelButton: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    height: 48,
-    justifyContent: 'center',
-  },
-  confirmButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: BUTTON_PURPLE,
-    borderRadius: 16,
-    height: 48,
-  },
-  modalButtonText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 16 },
 });

@@ -1,85 +1,45 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  TextInput,
-  StyleSheet,
-  Animated,
-  Pressable,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, TextInput, StyleSheet, Animated, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import PressableScale from './PressableScale';
+import FadeIn from './FadeIn';
+import {
+  FONT as FONT_NORMAL,
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  SURFACE_LIGHT,
+  ACCENT,
+  BUTTON_PURPLE,
+  TEXT_MUTED,
+  GREEN,
+  ERROR,
+} from '../constants/palette';
 
 export const NATIVE = Platform.OS !== 'web';
 
+// Re-exported so the auth screens keep importing everything from here
+export { PressableScale, FadeIn };
+
 export const COLORS = {
-  bgTop: '#14111F',
-  bgBottom: '#221B38',
-  surface: '#2D2545',
-  surfaceLight: '#3A3058',
-  accent: '#8E7CF0',
-  button: '#6A5BD6',
-  muted: '#B4AACB',
-  green: '#4ADE80',
-  error: '#FF9AA8',
+  bgTop: BG_TOP,
+  bgBottom: BG_BOTTOM,
+  surface: SURFACE,
+  surfaceLight: SURFACE_LIGHT,
+  accent: ACCENT,
+  button: BUTTON_PURPLE,
+  muted: TEXT_MUTED,
+  green: GREEN,
+  error: ERROR,
 };
 
 export const FONT = {
-  normal: 'Rajdhani_500Medium',
-  semi: 'Rajdhani_600SemiBold',
-  bold: 'Rajdhani_700Bold',
+  normal: FONT_NORMAL,
+  semi: FONT_SEMI,
+  bold: FONT_BOLD,
 };
-
-// Button that shrinks when pressed and springs back
-export function PressableScale({ onPress, wrapStyle, style, children, scale = 0.95, disabled }) {
-  const value = useRef(new Animated.Value(1)).current;
-
-  function pressIn() {
-    Animated.spring(value, { toValue: scale, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start();
-  }
-
-  function pressOut() {
-    Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 18, bounciness: 14 }).start();
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={pressIn}
-      onPressOut={pressOut}
-      disabled={disabled}
-      style={wrapStyle}
-    >
-      <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
-    </Pressable>
-  );
-}
-
-// Fades in and slides up, with an optional delay
-export function FadeIn({ delay = 0, style, children }) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
-      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 70, friction: 10 }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
-          transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
-        },
-      ]}
-    >
-      {children}
-    </Animated.View>
-  );
-}
 
 // Input with an icon and a highlighted border on focus
 export function AuthField({ icon, right, style, ...props }) {
