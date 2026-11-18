@@ -22,30 +22,25 @@ function getReturnUrl() {
   return Linking.createURL('auth');
 }
 
-async function loginWithGoogle(onSuccess) {
+async function loginWithProvider(provider, label, onSuccess) {
   try {
     const returnUrl = getReturnUrl();
-    const authUrl = `${BACKEND_URL}/auth/google?app=${encodeURIComponent(returnUrl)}`;
+    const authUrl = `${BACKEND_URL}/auth/${provider}?app=${encodeURIComponent(returnUrl)}`;
 
     const result = await WebBrowser.openAuthSessionAsync(authUrl, returnUrl);
     if (result.type !== 'success') return; // usuário fechou o navegador
 
     const { queryParams } = Linking.parse(result.url);
     if (queryParams?.error || !queryParams?.token) {
-      showAlert('Google', 'Não foi possível entrar com o Google.');
+      showAlert(label, `Não foi possível entrar com o ${label}.`);
       return;
     }
 
     await AsyncStorage.setItem(TOKEN_KEY, String(queryParams.token));
     if (onSuccess) onSuccess();
   } catch (e) {
-    showAlert('Google', 'Não foi possível entrar com o Google.');
+    showAlert(label, `Não foi possível entrar com o ${label}.`);
   }
-}
-
-function githubSoon() {
-  // TODO: ligar ao OAuth do GitHub
-  showAlert('GitHub', 'Login com GitHub em breve.');
 }
 
 const buttonStyle = {
@@ -63,7 +58,7 @@ const buttonStyle = {
 const labelStyle = { fontFamily: FONT.semi, color: '#fff', fontSize: 18 };
 
 // "ou" divider + Continue with Google and GitHub buttons
-export default function GithubLogin({ onSuccess, onPress = githubSoon, spacing = 24 }) {
+export default function GithubLogin({ onSuccess, spacing = 24 }) {
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: spacing }}>
@@ -72,14 +67,22 @@ export default function GithubLogin({ onSuccess, onPress = githubSoon, spacing =
         <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
       </View>
 
-      <PressableScale onPress={() => loginWithGoogle(onSuccess)} style={buttonStyle} scale={0.96}>
+      <PressableScale
+        onPress={() => loginWithProvider('google', 'Google', onSuccess)}
+        style={buttonStyle}
+        scale={0.96}
+      >
         <Ionicons name="logo-google" size={20} color="#fff" />
         <Text style={labelStyle}>Continuar com Google</Text>
       </PressableScale>
 
       <View style={{ height: 12 }} />
 
-      <PressableScale onPress={onPress} style={buttonStyle} scale={0.96}>
+      <PressableScale
+        onPress={() => loginWithProvider('github', 'GitHub', onSuccess)}
+        style={buttonStyle}
+        scale={0.96}
+      >
         <Ionicons name="logo-github" size={20} color="#fff" />
         <Text style={labelStyle}>Continuar com GitHub</Text>
       </PressableScale>
