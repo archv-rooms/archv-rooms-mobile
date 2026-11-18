@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 // Switch to false when the Render API is back
-export const TEST_MODE = true;
+export const TEST_MODE = false;
 
 const SITE = 'https://archvrooms-app.netlify.app';
 const BASE = Platform.OS === 'web' ? window.location.origin : SITE;
