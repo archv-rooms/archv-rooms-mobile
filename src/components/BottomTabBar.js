@@ -4,42 +4,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import { vibrate } from '../services/settings';
+import PressableScale from './PressableScale';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  SURFACE_LIGHT,
+  ACCENT,
+  BUTTON_PURPLE,
+  WHITE,
+  TEXT_MUTED,
+  ERROR,
+} from '../constants/palette';
 
 const NATIVE = Platform.OS !== 'web';
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
-
-const SURFACE_LIGHT = '#3A3058';
-const ACCENT = '#8E7CF0';
-const BUTTON_PURPLE = '#6A5BD6';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
-const ERROR = '#FF9AA8';
 
 const PILL_WIDTH = 56;
 const BAR_PADDING = 8;
 
 // Screens where the bar is visible, and the tab index of each one
 const TAB_INDEX = { Home: 0, Friends: 1, Rooms: 2, Settings: 3, About: 3 };
-
-// Button that shrinks when pressed and springs back
-function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93 }) {
-  const value = useRef(new Animated.Value(1)).current;
-
-  function pressIn() {
-    Animated.spring(value, { toValue: scale, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start();
-  }
-
-  function pressOut() {
-    Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 18, bounciness: 14 }).start();
-  }
-
-  return (
-    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} style={wrapStyle}>
-      <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
-    </Pressable>
-  );
-}
 
 function TabItem({ icon, activeIcon, label, active, onPress }) {
   const value = useRef(new Animated.Value(1)).current;

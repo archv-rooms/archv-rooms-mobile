@@ -1,12 +1,16 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  SURFACE,
+  WHITE,
+  TEXT_MUTED,
+  BUTTON_PURPLE,
+} from '../constants/palette';
 
-const SURFACE = '#2D2545';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
-const BUTTON_PURPLE = '#6A5BD6';
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
+// Cor usada só neste modal (botão de ação destrutiva)
+const DANGER = '#E5484D';
 
 let externalShow = null;
 
@@ -62,7 +66,7 @@ export function AlertProvider({ children }) {
                       styles.btn,
                       isCancel
                         ? styles.btnGhost
-                        : { backgroundColor: isDestructive ? '#E5484D' : BUTTON_PURPLE },
+                        : { backgroundColor: isDestructive ? DANGER : BUTTON_PURPLE },
                       pressed && styles.pressed,
                     ]}
                   >

@@ -5,15 +5,15 @@ import FadeIn from './FadeIn';
 import useFloat from '../hooks/useFloat';
 import { FONT_SEMI, TEXT_MUTED } from '../constants/palette';
 
-export default function EmptyState({ icon, text }) {
+export default function EmptyState({ icon, text, style, textStyle }) {
   const float = useFloat(6, 1600);
 
   return (
-    <FadeIn style={styles.empty}>
+    <FadeIn style={[styles.empty, style]}>
       <Animated.View style={[styles.emptyIcon, { transform: [{ translateY: float }] }]}>
         <Ionicons name={icon} size={34} color={TEXT_MUTED} />
       </Animated.View>
-      <Text style={styles.emptyText}>{text}</Text>
+      <Text style={[styles.emptyText, textStyle]}>{text}</Text>
     </FadeIn>
   );
 }

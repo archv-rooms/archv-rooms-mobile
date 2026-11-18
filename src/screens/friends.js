@@ -29,7 +29,7 @@ import { colorFor, statusInfo, OFFLINE_DOT } from '../services/friendHelpers';
 import PressableScale from '../components/PressableScale';
 import FadeIn from '../components/FadeIn';
 import AnimatedRow from '../components/AnimatedRow';
-import useFloat from '../hooks/useFloat';
+import EmptyState from '../components/EmptyState';
 import {
   FONT_SEMI,
   FONT_BOLD,
@@ -138,19 +138,6 @@ function AddButton({ sent, onPress }) {
         <Text style={[styles.buttonText, sent && { color: GREEN }]}>{sent ? 'Enviado' : 'Adicionar'}</Text>
       </Animated.View>
     </PressableScale>
-  );
-}
-
-function EmptyState({ icon, text }) {
-  const float = useFloat(6, 1600);
-
-  return (
-    <FadeIn style={styles.empty}>
-      <Animated.View style={[styles.emptyIcon, { transform: [{ translateY: float }] }]}>
-        <Ionicons name={icon} size={34} color={TEXT_MUTED} />
-      </Animated.View>
-      <Text style={styles.emptyText}>{text}</Text>
-    </FadeIn>
   );
 }
 
@@ -297,7 +284,12 @@ export default function FriendsScreen({ navigation }) {
         </FadeIn>
 
         {!loggedIn ? (
-          <EmptyState icon="lock-closed-outline" text="Entre na sua conta para ver seus amigos" />
+          <EmptyState
+            icon="lock-closed-outline"
+            text="Entre na sua conta para ver seus amigos"
+            style={styles.emptySpace}
+            textStyle={styles.emptyTextCenter}
+          />
         ) : (
           <>
             {searchOpen && (
@@ -356,7 +348,13 @@ export default function FriendsScreen({ navigation }) {
                 ))}
 
               {searching && results.length === 0 && (
-                <EmptyState key="no-results" icon="person-outline" text="Nenhum usuário encontrado" />
+                <EmptyState
+                  key="no-results"
+                  icon="person-outline"
+                  text="Nenhum usuário encontrado"
+                  style={styles.emptySpace}
+                  textStyle={styles.emptyTextCenter}
+                />
               )}
 
               {!searching && pending.length > 0 && (
@@ -408,7 +406,13 @@ export default function FriendsScreen({ navigation }) {
                 <>
                   <SectionHeader title="Amigos" count={friends.length} />
                   {friends.length === 0 && (
-                    <EmptyState key="no-friends" icon="people-outline" text="Nenhum amigo ainda" />
+                    <EmptyState
+                      key="no-friends"
+                      icon="people-outline"
+                      text="Nenhum amigo ainda"
+                      style={styles.emptySpace}
+                      textStyle={styles.emptyTextCenter}
+                    />
                   )}
                   {sortedFriends.map((friend, i) => {
                     const info = statusInfo(friend);
@@ -592,14 +596,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingVertical: 50 },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 18, textAlign: 'center' },
+  // Ajustes do EmptyState compartilhado, para ficar igual ao que esta tela tinha antes
+  emptySpace: { paddingTop: 50, paddingBottom: 50 },
+  emptyTextCenter: { textAlign: 'center' },
 });
