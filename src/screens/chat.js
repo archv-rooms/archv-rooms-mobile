@@ -23,39 +23,20 @@ import {
   buscarMensagens as fetchMessages,
   enviarMensagem as sendMessage,
 } from '../services/chat';
-
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
-
-const BG_TOP = '#14111F';
-const BG_BOTTOM = '#221B38';
-const SURFACE = '#2D2545';
-const SURFACE_LIGHT = '#3A3058';
-const ACCENT = '#8E7CF0';
-const BUTTON_PURPLE = '#6A5BD6';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
-const GREEN = '#4ADE80';
-const PLAYING = '#C4BAFF';
-const ERROR = '#FF9AA8';
-
-const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#C77CFF', '#FF4D4D'];
-
-// Same name always gets the same color
-function colorFor(name) {
-  let sum = 0;
-  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
-  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
-}
-
-function statusInfo(friend) {
-  if (friend.status === 'playing') {
-    return { label: friend.game ? 'Jogando ' + friend.game : 'Jogando', color: PLAYING, dot: PLAYING };
-  }
-  if (friend.status === 'online') return { label: 'Online', color: GREEN, dot: GREEN };
-  if (friend.status === 'offline') return { label: 'Offline', color: TEXT_MUTED, dot: '#6E6586' };
-  return null;
-}
+import { colorFor, statusInfo } from '../services/friendHelpers';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  SURFACE_LIGHT,
+  ACCENT,
+  BUTTON_PURPLE,
+  WHITE,
+  TEXT_MUTED,
+  ERROR,
+} from '../constants/palette';
 
 function formatTime(value) {
   if (!value) return '';
