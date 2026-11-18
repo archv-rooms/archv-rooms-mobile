@@ -61,7 +61,7 @@ export default function SignInScreen({ navigation }) {
       </FadeIn>
 
       <FadeIn delay={200}>
-        <GithubLogin spacing={24} />
+        <GithubLogin spacing={24} onSuccess={goHome} />
       </FadeIn>
 
       <View style={{ flex: 1, minHeight: 24 }} />
