@@ -1,10 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import { vibrate } from '../services/settings';
 import PressableScale from './PressableScale';
+import { SPRING } from '../constants/motion';
 import {
   FONT_SEMI,
   FONT_BOLD,
@@ -16,8 +24,6 @@ import {
   ERROR,
 } from '../constants/palette';
 
-const NATIVE = Platform.OS !== 'web';
-
 const PILL_WIDTH = 56;
 const BAR_PADDING = 8;
 
@@ -25,23 +31,26 @@ const BAR_PADDING = 8;
 const TAB_INDEX = { Home: 0, Friends: 1, Rooms: 2, Settings: 3, About: 3 };
 
 function TabItem({ icon, activeIcon, label, active, onPress }) {
-  const value = useRef(new Animated.Value(1)).current;
-  const isFirstRender = useRef(true);
+  const scale = useSharedValue(1);
+  const isFirst = React.useRef(true);
 
+  // O ícone dá um pequeno pulo quando a aba fica ativa
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
+    if (isFirst.current) {
+      isFirst.current = false;
       return;
     }
     if (active) {
-      value.setValue(0.7);
-      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 14, bounciness: 18 }).start();
+      scale.value = 0.75;
+      scale.value = withSpring(1, SPRING.pop);
     }
   }, [active]);
 
+  const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
   return (
     <PressableScale onPress={onPress} wrapStyle={{ flex: 1 }} style={styles.tabItem} scale={0.88}>
-      <Animated.View style={[styles.tabIcon, { transform: [{ scale: value }] }]}>
+      <Animated.View style={[styles.tabIcon, iconStyle]}>
         <Ionicons name={active ? activeIcon : icon} size={24} color={active ? WHITE : TEXT_MUTED} />
       </Animated.View>
       <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
@@ -59,40 +68,43 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
   const activeIndex = menuOpen ? 3 : routeIndex;
   const accountActive = menuOpen || currentRoute === 'Settings' || currentRoute === 'About';
 
-  const pillAnim = useRef(new Animated.Value(0)).current;
-  const enterAnim = useRef(new Animated.Value(0)).current;
-  const menuAnim = useRef(new Animated.Value(0)).current;
+  const itemWidth = barWidth > 0 ? (barWidth - BAR_PADDING * 2) / 4 : 0;
+
+  const pillIndex = useSharedValue(0);
+  const enter = useSharedValue(0);
+  const menu = useSharedValue(0);
 
   // The purple pill slides to the active tab
   useEffect(() => {
-    Animated.spring(pillAnim, {
-      toValue: activeIndex,
-      useNativeDriver: NATIVE,
-      tension: 140,
-      friction: 14,
-    }).start();
+    pillIndex.value = withSpring(activeIndex, SPRING.snappy);
   }, [activeIndex]);
 
   // The bar slides up when visible and down when hidden (login, game, chat, profile)
   useEffect(() => {
     if (!visible) setMenuOpen(false);
-    Animated.spring(enterAnim, {
-      toValue: visible ? 1 : 0,
-      useNativeDriver: NATIVE,
-      tension: 60,
-      friction: 10,
-    }).start();
+    enter.value = withSpring(visible ? 1 : 0, SPRING.soft);
   }, [visible]);
 
   // Account menu open/close
   useEffect(() => {
-    Animated.spring(menuAnim, {
-      toValue: menuOpen ? 1 : 0,
-      useNativeDriver: NATIVE,
-      tension: 120,
-      friction: 11,
-    }).start();
+    menu.value = withSpring(menuOpen ? 1 : 0, SPRING.soft);
   }, [menuOpen]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: pillIndex.value * itemWidth }],
+  }));
+
+  const barStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(enter.value, [0, 1], [120, 0]) }],
+  }));
+
+  const menuStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(menu.value, [0, 1], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateY: interpolate(menu.value, [0, 1], [18, 0]) },
+      { scale: interpolate(menu.value, [0, 1], [0.85, 1]) },
+    ],
+  }));
 
   function goTo(routeName) {
     vibrate(15);
@@ -107,17 +119,6 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
 
   if (!fontsLoaded) return null;
 
-  const itemWidth = barWidth > 0 ? (barWidth - BAR_PADDING * 2) / 4 : 0;
-  const pillTranslate = pillAnim.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: [0, itemWidth, itemWidth * 2, itemWidth * 3],
-  });
-  const barY = enterAnim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] });
-
-  const menuOpacity = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' });
-  const menuY = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [18, 0] });
-  const menuScale = menuAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
-
   return (
     <>
       {/* Closes the menu when tapping outside */}
@@ -126,10 +127,7 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
       {/* Account menu */}
       <Animated.View
         pointerEvents={menuOpen ? 'auto' : 'none'}
-        style={[
-          styles.menuWrapper,
-          { opacity: menuOpacity, transform: [{ translateY: menuY }, { scale: menuScale }] },
-        ]}
+        style={[styles.menuWrapper, menuStyle]}
       >
         <View style={styles.menu}>
           <PressableScale style={styles.menuItem} onPress={() => goTo('Profile')} scale={0.96}>
@@ -162,16 +160,14 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
       {/* Fixed bar */}
       <Animated.View
         pointerEvents={visible ? 'auto' : 'none'}
-        style={[styles.bar, { transform: [{ translateY: barY }] }]}
+        style={[styles.bar, barStyle]}
         onLayout={(e) => setBarWidth(e.nativeEvent.layout.width)}
       >
         <Animated.View
           style={[
             styles.pill,
-            {
-              left: BAR_PADDING + (itemWidth - PILL_WIDTH) / 2,
-              transform: [{ translateX: pillTranslate }],
-            },
+            { left: BAR_PADDING + (itemWidth - PILL_WIDTH) / 2 },
+            pillStyle,
           ]}
         />
         <TabItem
