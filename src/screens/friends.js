@@ -25,6 +25,7 @@ import {
   sendFriendRequest,
   respondToRequest,
 } from '../services/friends';
+import { colorFor, statusInfo, OFFLINE_DOT } from '../services/friendHelpers';
 import PressableScale from '../components/PressableScale';
 import FadeIn from '../components/FadeIn';
 import AnimatedRow from '../components/AnimatedRow';
@@ -41,15 +42,13 @@ import {
   WHITE,
   TEXT_MUTED,
   GREEN,
-  SOFT,
   ERROR,
 } from '../constants/palette';
 
 const NATIVE = Platform.OS !== 'web';
 
-// Cores usadas só nesta tela
+// Cor usada só nesta tela
 const REQUEST_BG = '#352C5E';
-const OFFLINE_DOT = '#6E6586';
 
 // Brilho roxo: no Android (elevation) vira mancha escura, então só usamos nas outras plataformas
 const GLOW =
@@ -61,25 +60,6 @@ const GLOW =
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 0 },
       };
-
-const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#C77CFF', '#FF4D4D'];
-
-// Same name always gets the same color
-function colorFor(name) {
-  let sum = 0;
-  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
-  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
-}
-
-// Text + color for each friend status
-function statusInfo(friend) {
-  if (friend.status === 'playing') {
-    return { label: friend.game ? 'Jogando ' + friend.game : 'Jogando', color: SOFT, dot: SOFT };
-  }
-  if (friend.status === 'online') return { label: 'Online', color: GREEN, dot: GREEN };
-  if (friend.status === 'offline') return { label: 'Offline', color: TEXT_MUTED, dot: OFFLINE_DOT };
-  return null;
-}
 
 const STATUS_ORDER = { playing: 0, online: 1, offline: 2 };
 

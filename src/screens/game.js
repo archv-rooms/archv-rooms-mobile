@@ -12,99 +12,16 @@ import {
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import { addSave, getSaveState } from '../services/saves';
+import { buildHtml, SAVE_JS, buildLoadJs } from '../services/emulator';
 import { useLandscape } from '../hooks/useLandscape';
 import { showAlert } from '../components/AppModal';
+import { WHITE, ERROR } from '../constants/palette';
 
-// Emulator core used for each console
-const CORES = {
-  NES: 'nes',
-  SNES: 'snes9x',
-  SFC: 'snes9x',
-  GBA: 'gba',
-  GB: 'gambatte',
-  GBC: 'gambatte',
-  'GAME BOY': 'gambatte',
-  N64: 'n64',
-  PS1: 'pcsx_rearmed',
-  PSX: 'pcsx_rearmed',
-  MD: 'genesis_plus_gx',
-  'MEGA DRIVE': 'genesis_plus_gx',
-};
-
-function getCore(consoleName) {
-  return CORES[(consoleName || '').toUpperCase()] || 'nes';
-}
-
-function buildHtml(game) {
-  const core = JSON.stringify(getCore(game.console));
-  const url = JSON.stringify(game.fileUrl || '').replace(/</g, '\\u003c');
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<style>
-  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
-  #game-container { width: 100%; height: 100%; }
-</style>
-</head>
-<body>
-<div id="game-container"></div>
-<script>
-  window.EJS_player = '#game-container';
-  window.EJS_core = ${core};
-  window.EJS_gameUrl = ${url};
-  window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
-  window.EJS_startOnLoaded = true;
-  // Tells the app when the game has really started
-  window.EJS_onGameStart = function () {
-    var msg = 'ejs-game-started';
-    if (window.ReactNativeWebView) {
-      window.ReactNativeWebView.postMessage(msg);
-    } else {
-      window.parent.postMessage(msg, '*');
-    }
-  };
-</script>
-<script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
-</body>
-</html>`;
-}
-
-// Reads the emulator state and sends it to the app as base64
-const SAVE_JS = `
-(function () {
-  try {
-    var state = window.EJS_emulator.gameManager.getState();
-    var bin = '';
-    var chunk = 0x8000;
-    for (var i = 0; i < state.length; i += chunk) {
-      bin += String.fromCharCode.apply(null, state.subarray(i, i + chunk));
-    }
-    window.ReactNativeWebView.postMessage('ejs-state:' + btoa(bin));
-  } catch (e) {
-    window.ReactNativeWebView.postMessage('ejs-error:' + e.message);
-  }
-})();
-true;
-`;
-
-// Loads a base64 state back into the emulator
-function buildLoadJs(b64) {
-  return `
-(function () {
-  try {
-    var bin = atob(${JSON.stringify(b64)});
-    var arr = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    window.EJS_emulator.gameManager.loadState(arr);
-  } catch (e) {
-    window.ReactNativeWebView.postMessage('ejs-error:' + e.message);
-  }
-})();
-true;
-`;
-}
+// Cores usadas só nesta tela
+const BLACK = '#000';
+const HEADER_BG = '#3A2F55';
+const LOADING_BG = '#1E1830';
+const LOADING_TEXT = '#B8B0C8';
 
 export default function GameScreen({ navigation, route }) {
   useLandscape();
@@ -186,7 +103,7 @@ export default function GameScreen({ navigation, route }) {
       title: game.title || 'Jogo',
       allow: 'autoplay; fullscreen; gamepad',
       allowFullScreen: true,
-      style: { flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: '#000' },
+      style: { flex: 1, width: '100%', height: '100%', border: 'none', backgroundColor: BLACK },
     });
   } else {
     content = (
@@ -216,14 +133,14 @@ export default function GameScreen({ navigation, route }) {
       {!landscape && (
         <View style={styles.header}>
           <TouchableOpacity onPress={goBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={26} color="#fff" />
+            <Ionicons name="arrow-back" size={26} color={WHITE} />
           </TouchableOpacity>
           <Text style={styles.title} numberOfLines={1}>
             {game ? game.title : 'Jogo'}
           </Text>
           {canSave && (
             <TouchableOpacity onPress={saveGame} style={styles.saveButton}>
-              <Ionicons name="save-outline" size={24} color="#fff" />
+              <Ionicons name="save-outline" size={24} color={WHITE} />
             </TouchableOpacity>
           )}
         </View>
@@ -235,7 +152,7 @@ export default function GameScreen({ navigation, route }) {
         {/* Loading screen on top of the emulator */}
         {showLoading && (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#fff" />
+            <ActivityIndicator size="large" color={WHITE} />
             <Text style={styles.loadingTitle}>{game.title}</Text>
             <Text style={styles.loadingText}>Carregando jogo...</Text>
           </View>
@@ -245,12 +162,12 @@ export default function GameScreen({ navigation, route }) {
       {/* Landscape: full screen, only floating buttons */}
       {landscape && (
         <TouchableOpacity onPress={goBack} style={styles.floatingBack}>
-          <Ionicons name="arrow-back" size={22} color="#fff" />
+          <Ionicons name="arrow-back" size={22} color={WHITE} />
         </TouchableOpacity>
       )}
       {landscape && canSave && (
         <TouchableOpacity onPress={saveGame} style={styles.floatingSave}>
-          <Ionicons name="save-outline" size={22} color="#fff" />
+          <Ionicons name="save-outline" size={22} color={WHITE} />
         </TouchableOpacity>
       )}
     </View>
@@ -258,35 +175,35 @@ export default function GameScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
+  container: { flex: 1, backgroundColor: BLACK },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 40,
     paddingBottom: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#3A2F55',
+    backgroundColor: HEADER_BG,
   },
   backButton: { marginRight: 12 },
   saveButton: { marginLeft: 12 },
-  title: { flex: 1, color: '#fff', fontSize: 18, fontWeight: '600' },
-  area: { flex: 1, backgroundColor: '#000' },
-  webview: { flex: 1, backgroundColor: '#000' },
+  title: { flex: 1, color: WHITE, fontSize: 18, fontWeight: '600' },
+  area: { flex: 1, backgroundColor: BLACK },
+  webview: { flex: 1, backgroundColor: BLACK },
   loading: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#1E1830',
+    backgroundColor: LOADING_BG,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   loadingTitle: {
-    color: '#fff',
+    color: WHITE,
     fontSize: 18,
     fontWeight: '600',
     marginTop: 20,
     textAlign: 'center',
   },
-  loadingText: { color: '#B8B0C8', fontSize: 14, marginTop: 6 },
+  loadingText: { color: LOADING_TEXT, fontSize: 14, marginTop: 6 },
   floatingBack: {
     position: 'absolute',
     top: 12,
@@ -310,5 +227,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  message: { color: '#FF9AA8', fontSize: 16, textAlign: 'center' },
+  message: { color: ERROR, fontSize: 16, textAlign: 'center' },
 });
