@@ -5,18 +5,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  BUTTON_PURPLE,
+  ACCENT,
+  WHITE,
+  TEXT_MUTED,
+} from '../constants/palette';
 
 export const ONBOARDING_KEY = 'onboarding_seen_v1';
-
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
-
-const BG_TOP = '#14111F';
-const BG_BOTTOM = '#221B38';
-const BUTTON_PURPLE = '#6A5BD6';
-const ACCENT = '#8E7CF0';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
 
 const SLIDES = [
   {

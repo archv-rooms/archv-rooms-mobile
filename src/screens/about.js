@@ -4,17 +4,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
-
-const BG_TOP = '#14111F';
-const BG_BOTTOM = '#221B38';
-const SURFACE = '#2D2545';
-const BUTTON_PURPLE = '#6A5BD6';
-const ACCENT = '#8E7CF0';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  BUTTON_PURPLE,
+  ACCENT,
+  WHITE,
+  TEXT_MUTED,
+} from '../constants/palette';
 
 export default function AboutScreen() {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
