@@ -7,6 +7,7 @@ import {
   Platform,
   StatusBar,
   ActivityIndicator,
+  Alert,
   useWindowDimensions,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
@@ -32,6 +33,7 @@ export default function GameScreen({ navigation, route }) {
   const landscape = width > height;
   const [loading, setLoading] = useState(true);
   const webRef = useRef(null);
+  const slotRef = useRef(1);
 
   // Web: listen for the message coming from inside the iframe
   useEffect(() => {
@@ -57,18 +59,36 @@ export default function GameScreen({ navigation, route }) {
     }
   }
 
+  function requestSave(slot) {
+    slotRef.current = slot;
+    if (webRef.current) webRef.current.injectJavaScript(SAVE_JS);
+  }
+
   function saveGame() {
     if (Platform.OS === 'web') {
       showAlert('Indisponível', 'Salvar só funciona no app do celular.');
       return;
     }
-    if (webRef.current) webRef.current.injectJavaScript(SAVE_JS);
+    Alert.alert(
+      'Salvar na nuvem',
+      'Escolha o slot (um save antigo no mesmo slot será substituído).',
+      [
+        { text: 'Slot 1', onPress: () => requestSave(1) },
+        { text: 'Slot 2', onPress: () => requestSave(2) },
+        { text: 'Slot 3', onPress: () => requestSave(3) },
+      ],
+      { cancelable: true }
+    );
   }
 
   async function loadSaveIntoGame() {
     try {
       const b64 = await getSaveState(saveId);
-      if (b64 && webRef.current) webRef.current.injectJavaScript(buildLoadJs(b64));
+      if (!b64) {
+        showAlert('Erro', 'Save não encontrado na nuvem.');
+        return;
+      }
+      if (webRef.current) webRef.current.injectJavaScript(buildLoadJs(b64));
     } catch (e) {
       showAlert('Erro', 'Não foi possível carregar o save.');
     }
@@ -81,9 +101,19 @@ export default function GameScreen({ navigation, route }) {
       // small delay so the emulator is ready before loading the state
       if (saveId) setTimeout(loadSaveIntoGame, 1500);
     } else if (data.startsWith('ejs-state:')) {
-      addSave(game, data.slice('ejs-state:'.length))
-        .then(() => showAlert('Save criado', 'Veja na aba Saves.'))
-        .catch(() => showAlert('Erro', 'Não foi possível guardar o save.'));
+      const slot = slotRef.current;
+      addSave(game, data.slice('ejs-state:'.length), slot)
+        .then(() => showAlert('Save criado', 'Slot ' + slot + ' salvo na nuvem. Veja na aba Saves.'))
+        .catch((e) => {
+          if (e && e.message === 'NO_LOGIN') {
+            showAlert(
+              'Sem conta',
+              'Sem login não há save na nuvem. Entre com uma conta para salvar.'
+            );
+          } else {
+            showAlert('Erro', 'Não foi possível guardar o save.');
+          }
+        });
     } else if (data.startsWith('ejs-error:')) {
       showAlert('Erro no emulador', data.slice('ejs-error:'.length));
     }
