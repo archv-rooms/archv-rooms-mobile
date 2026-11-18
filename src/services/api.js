@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Endereço da API do archv-rooms (o mesmo que o site usa)
-export const API_URL = 'https://archv-rooms.onrender.com/api';
+export const API_URL = 'https://archv-rooms-service.onrender.com/api';
 
 export const TOKEN_KEY = 'archv_token';
 

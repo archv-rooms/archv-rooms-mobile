@@ -111,7 +111,7 @@ export default function GameScreen({ navigation, route }) {
         ref={webRef}
         style={styles.webview}
         originWhitelist={['*']}
-        source={{ html: buildHtml(game), baseUrl: 'https://archv-rooms.onrender.com' }}
+        source={{ html: buildHtml(game), baseUrl: 'https://archv-rooms-service.onrender.com' }}
         javaScriptEnabled
         domStorageEnabled
         allowsInlineMediaPlayback
