@@ -24,28 +24,30 @@ import { listSaves, removeSave } from '../services/saves';
 import { loadProfile, DEFAULT_PROFILE } from '../services/profile';
 import { Avatar } from './profile';
 import { showAlert } from '../components/AppModal';
+import {
+  FONT,
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  SURFACE_LIGHT,
+  ACCENT,
+  BUTTON_PURPLE,
+  WHITE,
+  TEXT_MUTED,
+  PINK,
+  ERROR,
+  consoleColor,
+} from '../constants/palette';
 
 const TABS = ['Recent', 'Games', 'Saves'];
 const TAB_LABEL = { Recent: 'Recentes', Games: 'Jogos', Saves: 'Saves' };
 const NATIVE = Platform.OS !== 'web';
-const FONT = 'Rajdhani_500Medium';
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
 
 const FAVORITES_KEY = 'favoritos';
 const RECENTS_KEY = 'recentes';
 const MAX_RECENTS = 10;
-
-const BG_TOP = '#14111F';
-const BG_BOTTOM = '#221B38';
-const SURFACE = '#2D2545';
-const SURFACE_LIGHT = '#3A3058';
-const ACCENT = '#8E7CF0';
-const BUTTON_PURPLE = '#6A5BD6';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
-const PINK = '#FF6B8A';
-const ERROR = '#FF9AA8';
 
 // Placeholder cards, shown only while the API has not answered
 const SAMPLE_GAMES = [1, 2, 3, 4, 5, 6].map((n) => ({
@@ -53,25 +55,6 @@ const SAMPLE_GAMES = [1, 2, 3, 4, 5, 6].map((n) => ({
   title: 'Game ' + n,
   sample: true,
 }));
-
-// Color of each console (used when a game has no image)
-const CONSOLE_COLORS = {
-  NES: '#FF4D4D',
-  SNES: '#9B8CFF',
-  SFC: '#9B8CFF',
-  MD: '#3F8CFF',
-  'MEGA DRIVE': '#3F8CFF',
-  GB: '#7CE06B',
-  GBC: '#7CE06B',
-  GBA: '#C77CFF',
-  N64: '#FFB23C',
-  PS1: '#9AA3B5',
-  PSX: '#9AA3B5',
-};
-
-function consoleColor(name) {
-  return CONSOLE_COLORS[(name || '').toUpperCase()] || ACCENT;
-}
 
 // Value that slowly goes up and down
 function useFloat(amplitude, duration) {
