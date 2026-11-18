@@ -6,8 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Animated,
-  Easing,
-  Pressable,
   Image,
   Platform,
   RefreshControl,
@@ -24,6 +22,9 @@ import { listSaves, removeSave } from '../services/saves';
 import { loadProfile, DEFAULT_PROFILE } from '../services/profile';
 import { Avatar } from './profile';
 import { showAlert } from '../components/AppModal';
+import PressableScale from '../components/PressableScale';
+import FadeIn from '../components/FadeIn';
+import useFloat from '../hooks/useFloat';
 import {
   FONT,
   FONT_SEMI,
@@ -55,79 +56,6 @@ const SAMPLE_GAMES = [1, 2, 3, 4, 5, 6].map((n) => ({
   title: 'Game ' + n,
   sample: true,
 }));
-
-// Value that slowly goes up and down
-function useFloat(amplitude, duration) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(value, {
-          toValue: 1,
-          duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVE,
-        }),
-        Animated.timing(value, {
-          toValue: 0,
-          duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVE,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  return value.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
-}
-
-// Button that shrinks when pressed and springs back
-function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93 }) {
-  const value = useRef(new Animated.Value(1)).current;
-
-  function pressIn() {
-    Animated.spring(value, { toValue: scale, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start();
-  }
-
-  function pressOut() {
-    Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 18, bounciness: 14 }).start();
-  }
-
-  return (
-    <Pressable onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} style={wrapStyle}>
-      <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
-    </Pressable>
-  );
-}
-
-// Fades in and slides up, with an optional delay
-function FadeIn({ delay = 0, style, children }) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
-      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 70, friction: 10 }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
-          transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
-        },
-      ]}
-    >
-      {children}
-    </Animated.View>
-  );
-}
 
 // Heart that pops when favorited
 function HeartButton({ favorite, onPress }) {
