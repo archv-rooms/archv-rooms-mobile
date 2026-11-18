@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Animated,
-  Easing,
   Pressable,
   Platform,
   RefreshControl,
@@ -26,24 +25,31 @@ import {
   sendFriendRequest,
   respondToRequest,
 } from '../services/friends';
+import PressableScale from '../components/PressableScale';
+import FadeIn from '../components/FadeIn';
+import AnimatedRow from '../components/AnimatedRow';
+import useFloat from '../hooks/useFloat';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  SURFACE_LIGHT,
+  ACCENT,
+  BUTTON_PURPLE,
+  WHITE,
+  TEXT_MUTED,
+  GREEN,
+  SOFT,
+  ERROR,
+} from '../constants/palette';
 
 const NATIVE = Platform.OS !== 'web';
-const FONT_SEMI = 'Rajdhani_600SemiBold';
-const FONT_BOLD = 'Rajdhani_700Bold';
 
-const BG_TOP = '#14111F';
-const BG_BOTTOM = '#221B38';
-const SURFACE = '#2D2545';
-const SURFACE_LIGHT = '#3A3058';
+// Cores usadas só nesta tela
 const REQUEST_BG = '#352C5E';
-const ACCENT = '#8E7CF0';
-const BUTTON_PURPLE = '#6A5BD6';
-const WHITE = '#FFFFFF';
-const TEXT_MUTED = '#B4AACB';
-const GREEN = '#4ADE80';
-const PLAYING = '#C4BAFF';
 const OFFLINE_DOT = '#6E6586';
-const ERROR = '#FF9AA8';
 
 // Brilho roxo: no Android (elevation) vira mancha escura, então só usamos nas outras plataformas
 const GLOW =
@@ -68,7 +74,7 @@ function colorFor(name) {
 // Text + color for each friend status
 function statusInfo(friend) {
   if (friend.status === 'playing') {
-    return { label: friend.game ? 'Jogando ' + friend.game : 'Jogando', color: PLAYING, dot: PLAYING };
+    return { label: friend.game ? 'Jogando ' + friend.game : 'Jogando', color: SOFT, dot: SOFT };
   }
   if (friend.status === 'online') return { label: 'Online', color: GREEN, dot: GREEN };
   if (friend.status === 'offline') return { label: 'Offline', color: TEXT_MUTED, dot: OFFLINE_DOT };
@@ -76,111 +82,6 @@ function statusInfo(friend) {
 }
 
 const STATUS_ORDER = { playing: 0, online: 1, offline: 2 };
-
-// Value that slowly goes up and down
-function useFloat(amplitude, duration) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(value, {
-          toValue: 1,
-          duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVE,
-        }),
-        Animated.timing(value, {
-          toValue: 0,
-          duration,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: NATIVE,
-        }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  return value.interpolate({ inputRange: [0, 1], outputRange: [-amplitude, amplitude] });
-}
-
-// Button that shrinks when pressed and springs back
-function PressableScale({ onPress, wrapStyle, style, children, scale = 0.93, disabled }) {
-  const value = useRef(new Animated.Value(1)).current;
-
-  function pressIn() {
-    Animated.spring(value, { toValue: scale, useNativeDriver: NATIVE, speed: 50, bounciness: 0 }).start();
-  }
-
-  function pressOut() {
-    Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, speed: 18, bounciness: 14 }).start();
-  }
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={pressIn}
-      onPressOut={pressOut}
-      disabled={disabled}
-      style={wrapStyle}
-    >
-      <Animated.View style={[style, { transform: [{ scale: value }] }]}>{children}</Animated.View>
-    </Pressable>
-  );
-}
-
-// Fades in and slides up, with an optional delay
-function FadeIn({ delay = 0, style, children }) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(delay),
-      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 70, friction: 10 }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
-          transform: [{ translateY: value.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
-        },
-      ]}
-    >
-      {children}
-    </Animated.View>
-  );
-}
-
-// List row that pops in one after another
-function AnimatedRow({ index, children }) {
-  const value = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(Math.min(index, 8) * 60),
-      Animated.spring(value, { toValue: 1, useNativeDriver: NATIVE, tension: 60, friction: 9 }),
-    ]).start();
-  }, []);
-
-  return (
-    <Animated.View
-      style={{
-        opacity: value.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
-        transform: [
-          { translateY: value.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
-          { scale: value.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
-        ],
-      }}
-    >
-      {children}
-    </Animated.View>
-  );
-}
 
 // Avatar: colored ring + dot when the friend is online/playing, faded when offline
 function Avatar({ name, size = 42, info }) {
