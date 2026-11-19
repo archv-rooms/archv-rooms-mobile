@@ -11,6 +11,33 @@ import GithubLogin from '../components/GithubLogin';
 import StatusMessage from '../components/StatusMessage';
 import useShake from '../hooks/useShake';
 
+// Keeps only digits and formats them as DD/MM/YYYY while typing
+function formatBirthDate(text) {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+// Returns true only for a real calendar date that is not in the future
+function isValidBirthDate(value) {
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return false;
+
+  const day = Number(value.slice(0, 2));
+  const month = Number(value.slice(3, 5));
+  const year = Number(value.slice(6, 10));
+
+  if (year < 1900) return false;
+
+  const date = new Date(year, month - 1, day);
+  const isRealDate =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day;
+
+  return isRealDate && date <= new Date();
+}
+
 export default function SignUpScreen({ navigation }) {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -48,6 +75,11 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
+    if (birthDate !== '' && !isValidBirthDate(birthDate)) {
+      showError('Data de nascimento inválida. Use o formato DD/MM/AAAA.');
+      return;
+    }
+
     setError('');
     setSuccess(false);
     setLoading(true);
@@ -82,10 +114,10 @@ export default function SignUpScreen({ navigation }) {
           {/* Date of birth is not sent to the API */}
           <AuthField
             icon="calendar-outline"
-            placeholder="Data de nascimento"
+            placeholder="Data de nascimento (DD/MM/AAAA)"
             value={birthDate}
-            onChangeText={setBirthDate}
-            keyboardType="numbers-and-punctuation"
+            onChangeText={(text) => setBirthDate(formatBirthDate(text))}
+            keyboardType="number-pad"
             editable={!loading}
             right={
               <Pressable onPress={showBirthInfo} hitSlop={10}>
