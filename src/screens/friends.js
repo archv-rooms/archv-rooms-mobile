@@ -9,13 +9,14 @@ import {
   Pressable,
   Platform,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TOKEN_KEY } from '../services/api';
+import api, { TOKEN_KEY } from '../services/api';
 import { vibrate } from '../services/settings';
 import {
   listFriends,
@@ -140,6 +141,16 @@ function AddButton({ sent, onPress }) {
   );
 }
 
+function InfoStat({ icon, value, label }) {
+  return (
+    <View style={styles.infoStat}>
+      <Ionicons name={icon} size={20} color={ACCENT} />
+      <Text style={styles.infoStatValue}>{value}</Text>
+      <Text style={styles.infoStatLabel}>{label}</Text>
+    </View>
+  );
+}
+
 export default function FriendsScreen({ navigation }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
 
@@ -152,6 +163,8 @@ export default function FriendsScreen({ navigation }) {
   const [pendingOpen, setPendingOpen] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [animKey, setAnimKey] = useState(0);
+  const [selected, setSelected] = useState(null);
+  const [userStats, setUserStats] = useState({ matches: '-', rank: '-' });
 
   const focusAnim = useRef(new Animated.Value(0)).current;
 
@@ -229,6 +242,28 @@ export default function FriendsScreen({ navigation }) {
     navigation.navigate('Rooms', { invite: displayName(friend), ts: Date.now() });
   }
 
+  // Opens the user card and loads that user's stats
+  async function openUser(user, info, isFriend) {
+    vibrate(15);
+    setUserStats({ matches: '-', rank: '-' });
+    setSelected({ user, info, isFriend });
+    if (!user.username) return;
+    try {
+      const res = await api.get('/leaderboard/profile/' + user.username);
+      const d = res.data && res.data.data;
+      if (d) {
+        setUserStats({
+          matches: String(d.totalMatches || 0),
+          rank: d.rank ? '#' + d.rank : '-',
+        });
+      }
+    } catch (e) {}
+  }
+
+  function closeUser() {
+    setSelected(null);
+  }
+
   function focusSearch() {
     Animated.timing(focusAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start();
   }
@@ -255,6 +290,10 @@ export default function FriendsScreen({ navigation }) {
   const onlineCount = friends.filter((f) => f.status === 'online' || f.status === 'playing').length;
 
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
+
+  const selUser = selected && selected.user;
+  const selInfo = selected && selected.info;
+  const selOffline = selUser && selUser.status === 'offline';
 
   return (
     <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
@@ -333,7 +372,9 @@ export default function FriendsScreen({ navigation }) {
                 results.map((user, i) => (
                   <AnimatedRow key={'search-' + user.id} index={i}>
                     <View style={styles.row}>
-                      <Avatar name={displayName(user)} />
+                      <Pressable onPress={() => openUser(user, null, false)} hitSlop={6}>
+                        <Avatar name={displayName(user)} />
+                      </Pressable>
                       <Text style={styles.name} numberOfLines={1}>
                         {displayName(user)}
                       </Text>
@@ -366,11 +407,14 @@ export default function FriendsScreen({ navigation }) {
                   />
                   {pendingOpen &&
                     pending.map((request, i) => {
-                      const name = displayName(request.sender || request.user || request);
+                      const sender = request.sender || request.user || request;
+                      const name = displayName(sender);
                       return (
                         <AnimatedRow key={'request-' + animKey + '-' + request.id} index={i}>
                           <View style={[styles.row, styles.rowRequest]}>
-                            <Avatar name={name} size={36} />
+                            <Pressable onPress={() => openUser(sender, null, false)} hitSlop={6}>
+                              <Avatar name={name} size={36} />
+                            </Pressable>
                             <Text style={styles.name} numberOfLines={1}>
                               {name}
                             </Text>
@@ -419,7 +463,9 @@ export default function FriendsScreen({ navigation }) {
                           onPress={() => navigation.navigate('Chat', { friend })}
                           scale={0.97}
                         >
-                          <Avatar name={displayName(friend)} info={info} />
+                          <Pressable onPress={() => openUser(friend, info, true)} hitSlop={6}>
+                            <Avatar name={displayName(friend)} info={info} />
+                          </Pressable>
                           <View style={styles.friendInfo}>
                             <Text style={styles.nameInline} numberOfLines={1}>
                               {displayName(friend)}
@@ -451,6 +497,65 @@ export default function FriendsScreen({ navigation }) {
           </>
         )}
       </View>
+
+      {/* ---------- Cartão do usuário ---------- */}
+      <Modal visible={!!selected} transparent animationType="slide" onRequestClose={closeUser}>
+        <Pressable style={styles.modalBackdrop} onPress={closeUser}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            {selUser && (
+              <>
+                <View style={styles.modalHandle} />
+                <View style={{ alignItems: 'center' }}>
+                  <Avatar name={displayName(selUser)} size={88} info={selInfo} />
+                  <Text style={styles.modalName} numberOfLines={1}>
+                    {selUser.name || displayName(selUser)}
+                  </Text>
+                  {!!selUser.username && <Text style={styles.modalUsername}>@{selUser.username}</Text>}
+                  {selInfo && (
+                    <Text style={[styles.status, { color: selInfo.color, fontSize: 15, marginTop: 4 }]}>
+                      {selInfo.label}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.infoRow}>
+                  <InfoStat icon="game-controller" value={userStats.matches} label="PARTIDAS" />
+                  <InfoStat icon="trophy" value={userStats.rank} label="RANKING" />
+                </View>
+
+                {selected.isFriend && (
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Pressable
+                      style={[styles.modalButton, { backgroundColor: SURFACE_LIGHT }]}
+                      onPress={() => {
+                        const f = selUser;
+                        closeUser();
+                        navigation.navigate('Chat', { friend: f });
+                      }}
+                    >
+                      <Ionicons name="chatbubble-outline" size={18} color={WHITE} />
+                      <Text style={styles.buttonText}>Conversar</Text>
+                    </Pressable>
+                    {!selOffline && (
+                      <Pressable
+                        style={[styles.modalButton, { backgroundColor: BUTTON_PURPLE }]}
+                        onPress={() => {
+                          const f = selUser;
+                          closeUser();
+                          inviteToRoom(f);
+                        }}
+                      >
+                        <Ionicons name="game-controller" size={18} color={WHITE} />
+                        <Text style={styles.buttonText}>Jogar</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -589,6 +694,46 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Cartão do usuário
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalCard: {
+    backgroundColor: BG_BOTTOM,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 36,
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    marginBottom: 16,
+  },
+  modalName: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 24, marginTop: 12 },
+  modalUsername: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 15 },
+  infoRow: { flexDirection: 'row', gap: 10, marginTop: 18, marginBottom: 16 },
+  infoStat: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: SURFACE,
+    borderRadius: 18,
+    paddingVertical: 14,
+  },
+  infoStatValue: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 24 },
+  infoStatLabel: { fontFamily: FONT_BOLD, color: TEXT_MUTED, fontSize: 11, letterSpacing: 1 },
+  modalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 48,
+    borderRadius: 16,
   },
 
   // Ajustes do EmptyState compartilhado, para ficar igual ao que esta tela tinha antes
