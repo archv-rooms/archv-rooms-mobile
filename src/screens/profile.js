@@ -17,7 +17,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
 import api from '../services/api';
-import { TEST_GAMES } from '../services/mock';
 import { vibrate } from '../services/settings';
 import { loadProfile, saveProfile, DEFAULT_PROFILE } from '../services/profile';
 import { showAlert } from '../components/AppModal';
@@ -37,7 +36,6 @@ import {
 } from '../constants/palette';
 
 const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#C77CFF', '#2FC4DB', '#FB7C3C'];
-const GAMES = TEST_GAMES.map((g) => g.title);
 
 const NAME_MAX = 20;
 const BIO_MAX = 80;
@@ -91,6 +89,7 @@ export default function ProfileScreen({ navigation }) {
   const [focusField, setFocusField] = useState(null);
   const [notice, setNotice] = useState('');
   const [username, setUsername] = useState('');
+  const [gameTitles, setGameTitles] = useState([]);
   const [stats, setStats] = useState({ matches: '-', rank: '-', friends: '-' });
 
   const dirty = loaded && JSON.stringify(saved) !== JSON.stringify(draft);
@@ -116,6 +115,17 @@ export default function ProfileScreen({ navigation }) {
       setSaved(p);
       setDraft(p);
       setLoaded(true);
+
+      // Jogos reais para o "Jogo favorito"
+      try {
+        const res = await api.get('/games');
+        const body = res.data;
+        let list = [];
+        if (Array.isArray(body)) list = body;
+        else if (body && Array.isArray(body.data)) list = body.data;
+        else if (body && body.data && Array.isArray(body.data.games)) list = body.data.games;
+        setGameTitles(list.filter((g) => g && g.title).map((g) => g.title));
+      } catch (e) {}
 
       // Estatísticas reais
       try {
@@ -295,10 +305,13 @@ export default function ProfileScreen({ navigation }) {
             multiline
           />
 
-          {/* ---------- Jogo favorito ---------- */}
+          {/* ---------- Jogo favorito (jogos reais) ---------- */}
           <Text style={[styles.label, { marginTop: 18, marginBottom: 8 }]}>JOGO FAVORITO</Text>
           <View style={styles.gamesWrap}>
-            {GAMES.map((g) => {
+            {gameTitles.length === 0 && (
+              <Text style={styles.counter}>Carregando jogos...</Text>
+            )}
+            {gameTitles.map((g) => {
               const active = draft.favoriteGame === g;
               return (
                 <Pressable
