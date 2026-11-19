@@ -14,9 +14,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-import api from '../services/api';
+import api, { TOKEN_KEY } from '../services/api';
 import { vibrate } from '../services/settings';
 import { loadProfile, saveProfile, DEFAULT_PROFILE } from '../services/profile';
 import { showAlert } from '../components/AppModal';
@@ -85,6 +86,7 @@ export default function ProfileScreen({ navigation }) {
   const [saved, setSaved] = useState(DEFAULT_PROFILE);
   const [draft, setDraft] = useState(DEFAULT_PROFILE);
   const [loaded, setLoaded] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [showAvatar, setShowAvatar] = useState(false);
   const [focusField, setFocusField] = useState(null);
   const [notice, setNotice] = useState('');
@@ -98,6 +100,17 @@ export default function ProfileScreen({ navigation }) {
 
   useEffect(() => {
     async function start() {
+      // Convidado (sem token): não carrega nada da conta
+      let token = null;
+      try {
+        token = await AsyncStorage.getItem(TOKEN_KEY);
+      } catch (e) {}
+      if (!token) {
+        setIsGuest(true);
+        setLoaded(true);
+        return;
+      }
+
       let p = await loadProfile();
 
       // Nome e username reais da conta (se tiver login)
@@ -226,6 +239,39 @@ export default function ProfileScreen({ navigation }) {
   }
 
   if (!fontsLoaded || !loaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
+
+  // Modo convidado: o perfil é da conta, então pede cadastro
+  if (isGuest) {
+    return (
+      <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Pressable onPress={() => navigation.goBack()} style={styles.back}>
+              <Ionicons name="arrow-back" size={22} color={WHITE} />
+            </Pressable>
+            <Text style={styles.title}>Perfil</Text>
+          </View>
+
+          <View style={styles.guestBox}>
+            <View style={styles.guestIcon}>
+              <Ionicons name="person-outline" size={34} color={TEXT_MUTED} />
+            </View>
+            <Text style={styles.guestTitle}>Crie uma conta para ter seu perfil</Text>
+            <Text style={styles.guestText}>
+              Com uma conta você tem perfil, amigos, ranking e salas online. É de graça.
+            </Text>
+            <Pressable style={styles.guestButton} onPress={() => navigation.navigate('SignUp')}>
+              <Ionicons name="person-add" size={18} color={WHITE} />
+              <Text style={styles.saveText}>Criar conta</Text>
+            </Pressable>
+            <Pressable style={styles.guestLink} onPress={() => navigation.navigate('SignIn')}>
+              <Text style={styles.guestLinkText}>Já tenho conta</Text>
+            </Pressable>
+          </View>
+        </View>
+      </LinearGradient>
+    );
+  }
 
   return (
     <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
@@ -544,4 +590,35 @@ const styles = StyleSheet.create({
     height: 50,
     marginTop: 4,
   },
+
+  // ---------- Convidado ----------
+  guestBox: { alignItems: 'center', gap: 12, paddingTop: 50, paddingHorizontal: 10 },
+  guestIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 22, textAlign: 'center' },
+  guestText: {
+    fontFamily: FONT_SEMI,
+    color: TEXT_MUTED,
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  guestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: BUTTON_PURPLE,
+    borderRadius: 999,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  guestLink: { paddingVertical: 10, paddingHorizontal: 16 },
+  guestLinkText: { fontFamily: FONT_BOLD, color: ACCENT, fontSize: 15 },
 });

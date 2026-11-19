@@ -15,7 +15,7 @@ import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@exp
 import { useFonts } from 'expo-font';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/api';
+import api, { TOKEN_KEY } from '../services/api';
 import { listSaves, removeSave } from '../services/saves';
 import { loadProfile, DEFAULT_PROFILE } from '../services/profile';
 import { Avatar } from './profile';
@@ -24,6 +24,7 @@ import FadeIn from '../components/FadeIn';
 import GameCard from '../components/GameCard';
 import SaveItem from '../components/SaveItem';
 import EmptyState from '../components/EmptyState';
+import AdBanner from '../components/AdBanner';
 import useFloat from '../hooks/useFloat';
 import {
   FONT,
@@ -63,6 +64,7 @@ export default function HomeScreen({ navigation }) {
   const [profile, setProfile] = useState(DEFAULT_PROFILE);
   const [refreshing, setRefreshing] = useState(false);
   const [tabsWidth, setTabsWidth] = useState(0);
+  const [isGuest, setIsGuest] = useState(false);
 
   const tabAnim = useRef(new Animated.Value(0)).current;
   const focusAnim = useRef(new Animated.Value(0)).current;
@@ -87,7 +89,7 @@ export default function HomeScreen({ navigation }) {
     return matchesName && matchesFilter;
   });
 
-  let emptyText = 'Nenhum save ainda';
+  let emptyText = isGuest ? 'Crie uma conta para salvar seus jogos' : 'Nenhum save ainda';
   if (showCards) {
     if (!gamesLoaded) {
       emptyText = 'Carregando jogos...';
@@ -124,6 +126,9 @@ export default function HomeScreen({ navigation }) {
   // Reload the saves and the profile every time this screen comes back into focus
   useFocusEffect(
     useCallback(() => {
+      AsyncStorage.getItem(TOKEN_KEY)
+        .then((token) => setIsGuest(!token))
+        .catch(() => {});
       listSaves().then(setSaves);
       loadProfile().then(setProfile);
     }, [])
@@ -386,6 +391,7 @@ export default function HomeScreen({ navigation }) {
           />
         )}
       </View>
+      <AdBanner />
     </LinearGradient>
   );
 }

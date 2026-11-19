@@ -12,9 +12,10 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-import api from '../services/api';
+import api, { TOKEN_KEY } from '../services/api';
 import { vibrate } from '../services/settings';
 import { setGamesCache, getStatus, hostLabel } from '../services/roomHelpers';
 import { showAlert } from '../components/AppModal';
@@ -84,8 +85,43 @@ function EmptyState({ onCreate }) {
   );
 }
 
+// Tela mostrada para quem está no modo convidado (sem login)
+function GuestGate({ onSignUp, onSignIn }) {
+  const float = useFloat(6, 1600);
+  return (
+    <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <FadeIn style={styles.header}>
+          <View>
+            <Text style={styles.title}>Salas</Text>
+          </View>
+        </FadeIn>
+
+        <FadeIn delay={100} style={styles.guestBox}>
+          <Animated.View style={[styles.emptyIcon, { transform: [{ translateY: float }] }]}>
+            <Ionicons name="people-outline" size={34} color={TEXT_MUTED} />
+          </Animated.View>
+          <Text style={styles.guestTitle}>Crie uma conta para jogar online</Text>
+          <Text style={styles.guestText}>
+            As salas multiplayer só funcionam com uma conta. Cadastre-se de graça e jogue com seus
+            amigos.
+          </Text>
+          <PressableScale onPress={onSignUp} style={styles.emptyButton} scale={0.92}>
+            <Ionicons name="person-add" size={18} color={WHITE} />
+            <Text style={styles.createText}>Criar conta</Text>
+          </PressableScale>
+          <PressableScale onPress={onSignIn} style={styles.guestLink} scale={0.95}>
+            <Text style={styles.guestLinkText}>Já tenho conta</Text>
+          </PressableScale>
+        </FadeIn>
+      </View>
+    </LinearGradient>
+  );
+}
+
 export default function RoomsScreen({ route, navigation }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
+  const [isGuest, setIsGuest] = useState(null); // null = ainda checando
   const [rooms, setRooms] = useState([]);
   const [games, setGames] = useState([]);
   const [friendIds, setFriendIds] = useState([]);
@@ -133,11 +169,28 @@ export default function RoomsScreen({ route, navigation }) {
   }
 
   // Atualiza sempre que a tela volta ao foco (inclui voltar do lobby)
+  // Convidado (sem token) não carrega nada
   useFocusEffect(
     useCallback(() => {
-      loadRooms();
-      loadGames();
-      loadFriends();
+      let active = true;
+      (async () => {
+        let token = null;
+        try {
+          token = await AsyncStorage.getItem(TOKEN_KEY);
+        } catch (e) {}
+        if (!active) return;
+        if (!token) {
+          setIsGuest(true);
+          return;
+        }
+        setIsGuest(false);
+        loadRooms();
+        loadGames();
+        loadFriends();
+      })();
+      return () => {
+        active = false;
+      };
     }, [])
   );
 
@@ -238,7 +291,16 @@ export default function RoomsScreen({ route, navigation }) {
     setRefreshing(false);
   }
 
-  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
+  if (!fontsLoaded || isGuest === null) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
+
+  if (isGuest) {
+    return (
+      <GuestGate
+        onSignUp={() => navigation.navigate('SignUp')}
+        onSignIn={() => navigation.navigate('SignIn')}
+      />
+    );
+  }
 
   // ---------- Destaques (até 3): sua sala, salas com vaga, salas mais cheias ----------
   const isOpen = (r) => r.players < r.maxPlayers;
@@ -708,4 +770,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginTop: 4,
   },
+
+  // ---------- Convidado ----------
+  guestBox: { alignItems: 'center', gap: 12, paddingTop: 50, paddingHorizontal: 10 },
+  guestTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 22, textAlign: 'center' },
+  guestText: {
+    fontFamily: FONT_SEMI,
+    color: TEXT_MUTED,
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  guestLink: { paddingVertical: 10, paddingHorizontal: 16 },
+  guestLinkText: { fontFamily: FONT_BOLD, color: ACCENT, fontSize: 15 },
 });

@@ -87,8 +87,10 @@ export async function getSaveState(id) {
   const data = found ? parseSaveData(found.saveData) : null;
   return data && typeof data.state === 'string' ? data.state : null;
 }
-
-// O backend ainda não tem rota para apagar save
-export async function removeSave() {
-  throw new Error('DELETE_NOT_AVAILABLE');
+// Apaga o save pelo id "gameId:slot"
+export async function removeSave(id) {
+  const parts = String(id).split(':');
+  const gameId = parts[0];
+  const slot = Number(parts[1]);
+  await api.delete('/saves/' + gameId + '/' + slot);
 }

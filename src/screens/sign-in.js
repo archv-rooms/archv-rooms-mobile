@@ -34,6 +34,14 @@ export default function SignInScreen({ navigation }) {
     setBusy(false);
   }
 
+  // Modo convidado: remove qualquer token antigo e entra sem login
+  async function handleGuest() {
+    try {
+      await AsyncStorage.removeItem(TOKEN_KEY);
+    } catch (e) {}
+    goHome();
+  }
+
   return (
     <AuthLayout>
       <FadeIn style={s.header}>
@@ -64,6 +72,15 @@ export default function SignInScreen({ navigation }) {
 
       <FadeIn delay={200}>
         <GithubLogin spacing={24} onSuccess={goHome} />
+      </FadeIn>
+
+      <FadeIn delay={240}>
+        <Pressable
+          style={{ alignSelf: 'center', paddingVertical: 12, marginTop: 8 }}
+          onPress={handleGuest}
+        >
+          <Text style={s.link}>Jogar como convidado</Text>
+        </Pressable>
       </FadeIn>
 
       <View style={{ flex: 1, minHeight: 24 }} />
