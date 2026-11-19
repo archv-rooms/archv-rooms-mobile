@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../services/api';
 import { addSave, getSaveState } from '../services/saves';
 import { buildHtml, SAVE_JS, buildLoadJs } from '../services/emulator';
 import { useLandscape } from '../hooks/useLandscape';
@@ -34,12 +35,44 @@ export default function GameScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const webRef = useRef(null);
   const slotRef = useRef(1);
+  const sessionIdRef = useRef(null);
+
+  // Ranking: começa a contar o tempo de jogo
+  async function startSession() {
+    if (sessionIdRef.current || !game) return;
+    const gameId = Number(game.id);
+    if (!gameId) return;
+    try {
+      const res = await api.post('/sessions/start', { gameId });
+      sessionIdRef.current = res.data.data.session.id;
+    } catch (e) {}
+  }
+
+  // Ranking: para de contar o tempo (sem login ou erro, ignora)
+  async function endSession() {
+    const id = sessionIdRef.current;
+    if (!id) return;
+    sessionIdRef.current = null;
+    try {
+      await api.patch('/sessions/' + id + '/end');
+    } catch (e) {}
+  }
+
+  // Ao sair da tela do jogo, encerra a sessão
+  useEffect(() => {
+    return () => {
+      endSession();
+    };
+  }, []);
 
   // Web: listen for the message coming from inside the iframe
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined;
     function onMessage(event) {
-      if (event.data === 'ejs-game-started') setLoading(false);
+      if (event.data === 'ejs-game-started') {
+        setLoading(false);
+        startSession();
+      }
     }
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
@@ -52,6 +85,7 @@ export default function GameScreen({ navigation, route }) {
   }, []);
 
   function goBack() {
+    endSession();
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
@@ -98,6 +132,7 @@ export default function GameScreen({ navigation, route }) {
     if (typeof data !== 'string') return;
     if (data === 'ejs-game-started') {
       setLoading(false);
+      startSession();
       // small delay so the emulator is ready before loading the state
       if (saveId) setTimeout(loadSaveIntoGame, 1500);
     } else if (data.startsWith('ejs-state:')) {

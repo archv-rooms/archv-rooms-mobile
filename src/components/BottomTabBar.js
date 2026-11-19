@@ -28,7 +28,7 @@ const PILL_WIDTH = 56;
 const BAR_PADDING = 8;
 
 // Screens where the bar is visible, and the tab index of each one
-const TAB_INDEX = { Home: 0, Friends: 1, Rooms: 2, Settings: 3, About: 3 };
+const TAB_INDEX = { Home: 0, Friends: 1, Rooms: 2, Settings: 3, About: 3, Ranking: 3 };
 
 function TabItem({ icon, activeIcon, label, active, onPress }) {
   const scale = useSharedValue(1);
@@ -66,7 +66,8 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
   const visible = TAB_INDEX[currentRoute] !== undefined;
   const routeIndex = visible ? TAB_INDEX[currentRoute] : 0;
   const activeIndex = menuOpen ? 3 : routeIndex;
-  const accountActive = menuOpen || currentRoute === 'Settings' || currentRoute === 'About';
+  const accountActive =
+    menuOpen || currentRoute === 'Settings' || currentRoute === 'About' || currentRoute === 'Ranking';
 
   const itemWidth = barWidth > 0 ? (barWidth - BAR_PADDING * 2) / 4 : 0;
 
@@ -133,6 +134,10 @@ export default function BottomTabBar({ currentRoute, onNavigate, onSignOut }) {
           <PressableScale style={styles.menuItem} onPress={() => goTo('Profile')} scale={0.96}>
             <Ionicons name="person-outline" size={20} color={WHITE} />
             <Text style={styles.menuText}>Perfil</Text>
+          </PressableScale>
+          <PressableScale style={styles.menuItem} onPress={() => goTo('Ranking')} scale={0.96}>
+            <Ionicons name="trophy-outline" size={20} color={WHITE} />
+            <Text style={styles.menuText}>Ranking</Text>
           </PressableScale>
           <PressableScale style={styles.menuItem} onPress={() => goTo('Settings')} scale={0.96}>
             <Ionicons name="settings-outline" size={20} color={WHITE} />

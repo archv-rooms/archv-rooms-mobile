@@ -16,7 +16,6 @@ import { useFonts } from 'expo-font';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
-import { TEST_MODE, TEST_GAMES } from '../services/mock';
 import { listSaves, removeSave } from '../services/saves';
 import { loadProfile, DEFAULT_PROFILE } from '../services/profile';
 import { Avatar } from './profile';
@@ -49,18 +48,12 @@ const FAVORITES_KEY = 'favoritos';
 const RECENTS_KEY = 'recentes';
 const MAX_RECENTS = 10;
 
-// Placeholder cards, shown only while the API has not answered
-const SAMPLE_GAMES = [1, 2, 3, 4, 5, 6].map((n) => ({
-  id: 'sample-' + n,
-  title: 'Game ' + n,
-  sample: true,
-}));
-
 export default function HomeScreen({ navigation }) {
   const [fontsLoaded] = useFonts({ Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold });
 
   const [activeTab, setActiveTab] = useState('Recent');
-  const [games, setGames] = useState(SAMPLE_GAMES);
+  const [games, setGames] = useState([]);
+  const [gamesLoaded, setGamesLoaded] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
@@ -96,8 +89,12 @@ export default function HomeScreen({ navigation }) {
 
   let emptyText = 'Nenhum save ainda';
   if (showCards) {
-    emptyText =
-      activeTab === 'Recent' && recents.length === 0 ? 'Nenhum jogo recente' : 'Nenhum jogo encontrado';
+    if (!gamesLoaded) {
+      emptyText = 'Carregando jogos...';
+    } else {
+      emptyText =
+        activeTab === 'Recent' && recents.length === 0 ? 'Nenhum jogo recente' : 'Nenhum jogo encontrado';
+    }
   }
 
   // The tab pill slides
@@ -133,10 +130,6 @@ export default function HomeScreen({ navigation }) {
   );
 
   async function loadGames() {
-    if (TEST_MODE) {
-      setGames(TEST_GAMES);
-      return;
-    }
     try {
       const res = await api.get('/games');
       const body = res.data;
@@ -148,12 +141,13 @@ export default function HomeScreen({ navigation }) {
       } else if (body && body.data && Array.isArray(body.data.games)) {
         result = body.data.games;
       }
-      if (result.length > 0) setGames(result);
+      setGames(result);
       setError('');
     } catch (e) {
       const message = e?.response?.data?.message || 'Não foi possível carregar os jogos.';
       setError(message);
     }
+    setGamesLoaded(true);
   }
 
   async function refresh() {
@@ -180,10 +174,6 @@ export default function HomeScreen({ navigation }) {
   }
 
   async function openGame(game) {
-    if (game.sample) {
-      setError('Este é um cartão de exemplo. Os jogos reais aparecem quando a API voltar.');
-      return;
-    }
     try {
       let fullGame = game;
       if (!game.fileUrl) {
@@ -194,9 +184,7 @@ export default function HomeScreen({ navigation }) {
       navigation.navigate('Game', { game: fullGame });
     } catch (e) {
       let message = 'Não foi possível abrir o jogo.';
-      if (e?.response?.status === 403) {
-        message = 'Seu plano não permite acesso a este jogo.';
-      } else if (e?.response?.data?.message) {
+      if (e?.response?.data?.message) {
         message = e.response.data.message;
       }
       setError(message);

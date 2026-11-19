@@ -88,6 +88,7 @@ export default function RoomsScreen({ route, navigation }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
   const [rooms, setRooms] = useState([]);
   const [games, setGames] = useState([]);
+  const [friendIds, setFriendIds] = useState([]);
   const [notice, setNotice] = useState('');
   const [filter, setFilter] = useState('all');
   const [showCreate, setShowCreate] = useState(false);
@@ -122,11 +123,21 @@ export default function RoomsScreen({ route, navigation }) {
     } catch (e) {}
   }
 
+  // Amigos reais: guarda só os ids para o filtro "Amigos"
+  async function loadFriends() {
+    try {
+      const res = await api.get('/friends');
+      const list = extractList(res, 'friends');
+      setFriendIds(list.map((f) => f.id));
+    } catch (e) {}
+  }
+
   // Atualiza sempre que a tela volta ao foco (inclui voltar do lobby)
   useFocusEffect(
     useCallback(() => {
       loadRooms();
       loadGames();
+      loadFriends();
     }, [])
   );
 
@@ -222,7 +233,7 @@ export default function RoomsScreen({ route, navigation }) {
   async function onRefresh() {
     setRefreshing(true);
     vibrate(20);
-    await Promise.all([loadRooms(), loadGames()]);
+    await Promise.all([loadRooms(), loadGames(), loadFriends()]);
     setAnimKey((k) => k + 1);
     setRefreshing(false);
   }
@@ -231,8 +242,10 @@ export default function RoomsScreen({ route, navigation }) {
 
   // ---------- Destaques (até 3): sua sala, salas com vaga, salas mais cheias ----------
   const isOpen = (r) => r.players < r.maxPlayers;
-  // O filtro "Amigos" será ligado à lista de amigos reais em uma próxima etapa
-  const isFriend = () => false;
+  // Sala de amigo: o dono ou algum membro (que não seja você) está na sua lista de amigos
+  const isFriend = (r) =>
+    friendIds.includes(r.hostId) ||
+    (Array.isArray(r.members) && r.members.some((m) => m && friendIds.includes(m.id)));
 
   const featuredList = [];
   const addFeatured = (r) => {

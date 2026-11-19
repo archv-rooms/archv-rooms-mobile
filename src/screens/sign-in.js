@@ -11,18 +11,19 @@ import GithubLogin from '../components/GithubLogin';
 export default function SignInScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
 
   function goHome() {
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   }
 
   async function handleLogin() {
-    // Empty fields skip the login and enter without an account (test access)
+    if (busy) return;
     if (!email.trim() || !password) {
-      await AsyncStorage.removeItem(TOKEN_KEY);
-      goHome();
+      showAlert('Campos vazios', 'Preencha o e-mail e a senha para entrar.');
       return;
     }
+    setBusy(true);
     try {
       const res = await api.post('/auth/login', { email: email.trim(), password });
       await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
@@ -30,6 +31,7 @@ export default function SignInScreen({ navigation }) {
     } catch (e) {
       showAlert('Erro', 'E-mail ou senha incorretos.');
     }
+    setBusy(false);
   }
 
   return (

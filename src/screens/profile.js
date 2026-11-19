@@ -16,7 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
 import { useFonts } from 'expo-font';
-import { TEST_GAMES, TEST_FRIENDS } from '../services/mock';
+import api from '../services/api';
+import { TEST_GAMES } from '../services/mock';
 import { vibrate } from '../services/settings';
 import { loadProfile, saveProfile, DEFAULT_PROFILE } from '../services/profile';
 import { showAlert } from '../components/AppModal';
@@ -89,17 +90,55 @@ export default function ProfileScreen({ navigation }) {
   const [showAvatar, setShowAvatar] = useState(false);
   const [focusField, setFocusField] = useState(null);
   const [notice, setNotice] = useState('');
+  const [username, setUsername] = useState('');
+  const [stats, setStats] = useState({ matches: '-', rank: '-', friends: '-' });
 
   const dirty = loaded && JSON.stringify(saved) !== JSON.stringify(draft);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
   useEffect(() => {
-    loadProfile().then((p) => {
+    async function start() {
+      let p = await loadProfile();
+
+      // Nome e username reais da conta (se tiver login)
+      let accountUsername = '';
+      try {
+        const res = await api.get('/user/profile');
+        const user = res.data && res.data.data && res.data.data.user;
+        if (user) {
+          accountUsername = user.username || '';
+          if (user.name) p = { ...p, name: user.name.slice(0, NAME_MAX) };
+        }
+      } catch (e) {}
+
+      setUsername(accountUsername);
       setSaved(p);
       setDraft(p);
       setLoaded(true);
-    });
+
+      // Estatísticas reais
+      try {
+        const friendsRes = await api.get('/friends');
+        const friendsList = (friendsRes.data && friendsRes.data.data) || [];
+        setStats((s) => ({ ...s, friends: String(friendsList.length) }));
+      } catch (e) {}
+
+      if (accountUsername) {
+        try {
+          const res = await api.get('/leaderboard/profile/' + accountUsername);
+          const d = res.data && res.data.data;
+          if (d) {
+            setStats((s) => ({
+              ...s,
+              matches: String(d.totalMatches || 0),
+              rank: d.rank ? '#' + d.rank : '-',
+            }));
+          }
+        } catch (e) {}
+      }
+    }
+    start();
   }, []);
 
   // Voltar com alterações não salvas (seta ou botão voltar do Android)
@@ -151,6 +190,19 @@ export default function ProfileScreen({ navigation }) {
 
   async function save() {
     const clean = { ...draft, name: draft.name.trim() || DEFAULT_PROFILE.name, bio: draft.bio.trim() };
+
+    // Se o nome mudou e há conta logada, salva o nome no servidor
+    if (clean.name !== saved.name && clean.name.length >= 2) {
+      try {
+        await api.patch('/user/name', { name: clean.name });
+      } catch (e) {
+        const status = e && e.response && e.response.status;
+        if (status !== 401) {
+          showAlert('Aviso', 'Não foi possível salvar o nome na conta. Ele foi salvo só neste celular.');
+        }
+      }
+    }
+
     const ok = await saveProfile(clean);
     if (!ok) {
       showAlert('Erro', 'Não foi possível salvar o perfil.');
@@ -199,16 +251,17 @@ export default function ProfileScreen({ navigation }) {
               </View>
             </Pressable>
             <Text style={styles.avatarName} numberOfLines={1}>{draft.name.trim() || DEFAULT_PROFILE.name}</Text>
+            {username !== '' && <Text style={styles.username}>@{username}</Text>}
             <Pressable onPress={() => setShowAvatar(true)}>
               <Text style={styles.editLink}>Editar avatar</Text>
             </Pressable>
           </View>
 
-          {/* ---------- Estatísticas (dados de teste) ---------- */}
+          {/* ---------- Estatísticas reais ---------- */}
           <View style={styles.statsRow}>
-            <Stat icon="game-controller" value="128" label="PARTIDAS" />
-            <Stat icon="trophy" value="74" label="VITÓRIAS" />
-            <Stat icon="people" value={String(TEST_FRIENDS.length)} label="AMIGOS" />
+            <Stat icon="game-controller" value={stats.matches} label="PARTIDAS" />
+            <Stat icon="trophy" value={stats.rank} label="RANKING" />
+            <Stat icon="people" value={stats.friends} label="AMIGOS" />
           </View>
 
           {/* ---------- Nome ---------- */}
@@ -370,6 +423,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarName: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 24, marginTop: 10 },
+  username: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 15 },
   editLink: { fontFamily: FONT_BOLD, color: ACCENT, fontSize: 15, marginTop: 2 },
 
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
