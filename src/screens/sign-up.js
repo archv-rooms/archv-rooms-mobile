@@ -3,7 +3,6 @@ import { View, Text, Image, Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
-import { TEST_MODE } from '../services/mock';
 import { showAlert } from '../components/AppModal';
 import { COLORS, FONT, FadeIn, AuthField, PrimaryButton, authStyles as s } from '../components/auth-kit';
 import AuthLayout from '../components/AuthLayout';
@@ -52,14 +51,6 @@ export default function SignUpScreen({ navigation }) {
     setError('');
     setSuccess(false);
     setLoading(true);
-
-    // Test mode: pretends the account was created, without calling the API
-    if (TEST_MODE) {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setLoading(false);
-      setSuccess(true);
-      return;
-    }
 
     try {
       await api.post(

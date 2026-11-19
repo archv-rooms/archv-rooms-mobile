@@ -16,7 +16,6 @@ import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdh
 import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOKEN_KEY } from '../services/api';
-import { TEST_MODE } from '../services/mock';
 import { vibrate } from '../services/settings';
 import {
   listFriends,
@@ -166,7 +165,7 @@ export default function FriendsScreen({ navigation }) {
   useEffect(() => {
     async function start() {
       const token = await AsyncStorage.getItem(TOKEN_KEY);
-      if (!token && !TEST_MODE) {
+      if (!token) {
         setLoggedIn(false);
         return;
       }
@@ -216,10 +215,6 @@ export default function FriendsScreen({ navigation }) {
     vibrate(30);
     try {
       await respondToRequest(id, status);
-      if (TEST_MODE) {
-        setPending((list) => list.filter((item) => item.id !== id));
-        return;
-      }
       load();
     } catch (e) {}
   }

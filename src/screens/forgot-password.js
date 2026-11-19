@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, Image, Animated, Pressable } from 'react-native';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
-import { TEST_MODE } from '../services/mock';
 import { FadeIn, AuthField, PrimaryButton, authStyles as s } from '../components/auth-kit';
 import AuthLayout from '../components/AuthLayout';
 import StatusMessage from '../components/StatusMessage';
@@ -33,14 +32,6 @@ export default function ForgotPasswordScreen({ navigation }) {
     setError('');
     setSent(false);
     setLoading(true);
-
-    // Test mode: pretends the link was sent, without calling the API
-    if (TEST_MODE) {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setLoading(false);
-      setSent(true);
-      return;
-    }
 
     try {
       await api.post('/auth/forgot-password', { email: email.trim() }, { timeout: 90000 });
