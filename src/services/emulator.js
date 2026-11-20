@@ -62,6 +62,9 @@ export function buildHtml(game, online = true) {
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/latest/data/';
   window.EJS_startOnLoaded = true;
   window.EJS_DEBUG_XX = true;
+
+  // Cor do menu (roxo do app)
+  window.EJS_color = '#8E7CF0';
 ${netplay}
   // Tells the app when the game has really started
   window.EJS_onGameStart = function () {
