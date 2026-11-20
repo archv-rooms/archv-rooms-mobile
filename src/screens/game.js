@@ -6,29 +6,74 @@ import {
   StyleSheet,
   Platform,
   StatusBar,
-  ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   useWindowDimensions,
 } from 'react-native';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
+import { useFonts } from 'expo-font';
 import api, { TOKEN_KEY } from '../services/api';
 import { addSave, getSaveState } from '../services/saves';
 import { buildHtml, SAVE_JS, buildLoadJs } from '../services/emulator';
+import { getAccent } from '../services/roomHelpers';
 import { useLandscape } from '../hooks/useLandscape';
 import { showAlert } from '../components/AppModal';
-import { WHITE, ERROR } from '../constants/palette';
+import Cover from '../components/Cover';
+import {
+  FONT_SEMI,
+  FONT_BOLD,
+  BG_TOP,
+  BG_BOTTOM,
+  SURFACE,
+  ACCENT,
+  WHITE,
+  TEXT_MUTED,
+  ERROR,
+} from '../constants/palette';
 
-// Cores usadas só nesta tela
 const BLACK = '#000';
-const HEADER_BG = '#3A2F55';
-const LOADING_BG = '#1E1830';
-const LOADING_TEXT = '#B8B0C8';
+const BAR_TRACK = 160;
+const BAR_SIZE = 56;
+
+// Barrinha que desliza enquanto o jogo carrega
+function LoadingBar() {
+  const slide = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(slide, {
+        toValue: 1,
+        duration: 1300,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  const translateX = slide.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-BAR_SIZE, BAR_TRACK],
+  });
+
+  return (
+    <View style={styles.barTrack}>
+      <Animated.View style={[styles.barFill, { transform: [{ translateX }] }]} />
+    </View>
+  );
+}
 
 export default function GameScreen({ navigation, route }) {
   useLandscape();
 
+  const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
   const game = route?.params?.game || null;
   const saveId = route?.params?.saveId || null;
   const { width, height } = useWindowDimensions();
@@ -172,6 +217,8 @@ export default function GameScreen({ navigation, route }) {
     }
   }
 
+  if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BLACK }} />;
+
   let content = null;
 
   if (!game || !game.fileUrl) {
@@ -210,23 +257,25 @@ export default function GameScreen({ navigation, route }) {
 
   const showLoading = loading && game && game.fileUrl;
   const canSave = game && game.fileUrl && Platform.OS !== 'web';
+  const accent = getAccent(game ? game.title : '');
+  const coverSize = landscape ? 84 : 120;
 
   return (
     <View style={styles.container}>
       <StatusBar hidden={landscape} />
 
-      {/* Portrait: normal title bar */}
+      {/* Portrait: barra de cima */}
       {!landscape && (
         <View style={styles.header}>
-          <TouchableOpacity onPress={goBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={26} color={WHITE} />
+          <TouchableOpacity onPress={goBack} style={styles.roundButton}>
+            <Ionicons name="arrow-back" size={22} color={WHITE} />
           </TouchableOpacity>
           <Text style={styles.title} numberOfLines={1}>
             {game ? game.title : 'Jogo'}
           </Text>
           {canSave && (
-            <TouchableOpacity onPress={saveGame} style={styles.saveButton}>
-              <Ionicons name="save-outline" size={24} color={WHITE} />
+            <TouchableOpacity onPress={saveGame} style={styles.roundButton}>
+              <Ionicons name="save-outline" size={21} color={WHITE} />
             </TouchableOpacity>
           )}
         </View>
@@ -235,17 +284,37 @@ export default function GameScreen({ navigation, route }) {
       <View style={styles.area}>
         {content}
 
-        {/* Loading screen on top of the emulator */}
+        {/* Tela de carregando por cima do emulador */}
         {showLoading && (
-          <View style={styles.loading}>
-            <ActivityIndicator size="large" color={WHITE} />
-            <Text style={styles.loadingTitle}>{game.title}</Text>
-            <Text style={styles.loadingText}>Carregando jogo...</Text>
-          </View>
+          <Reanimated.View
+            exiting={FadeOut.duration(350)}
+            style={StyleSheet.absoluteFill}
+          >
+            <LinearGradient colors={[BG_TOP, BG_BOTTOM]} style={styles.loading}>
+              <Reanimated.View entering={FadeIn.duration(400)} style={styles.loadingInner}>
+                <View
+                  style={[
+                    styles.coverBox,
+                    { width: coverSize, height: coverSize, borderColor: accent + '66' },
+                  ]}
+                >
+                  <Cover
+                    uri={game.image}
+                    accent={accent}
+                    iconSize={coverSize * 0.45}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </View>
+                <Text style={styles.loadingTitle} numberOfLines={2}>{game.title}</Text>
+                <Text style={styles.loadingText}>Carregando jogo...</Text>
+                <LoadingBar />
+              </Reanimated.View>
+            </LinearGradient>
+          </Reanimated.View>
         )}
       </View>
 
-      {/* Landscape: full screen, only floating buttons */}
+      {/* Landscape: tela cheia, só os botões flutuantes */}
       {landscape && (
         <TouchableOpacity onPress={goBack} style={styles.floatingBack}>
           <Ionicons name="arrow-back" size={22} color={WHITE} />
@@ -253,7 +322,7 @@ export default function GameScreen({ navigation, route }) {
       )}
       {landscape && canSave && (
         <TouchableOpacity onPress={saveGame} style={styles.floatingSave}>
-          <Ionicons name="save-outline" size={22} color={WHITE} />
+          <Ionicons name="save-outline" size={21} color={WHITE} />
         </TouchableOpacity>
       )}
     </View>
@@ -262,34 +331,62 @@ export default function GameScreen({ navigation, route }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BLACK },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 40,
+    gap: 12,
+    paddingTop: Platform.OS === 'ios' ? 56 : 44,
     paddingBottom: 12,
     paddingHorizontal: 16,
-    backgroundColor: HEADER_BG,
+    backgroundColor: BG_TOP,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
-  backButton: { marginRight: 12 },
-  saveButton: { marginLeft: 12 },
-  title: { flex: 1, color: WHITE, fontSize: 18, fontWeight: '600' },
-  area: { flex: 1, backgroundColor: BLACK },
-  webview: { flex: 1, backgroundColor: BLACK },
-  loading: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: LOADING_BG,
+  roundButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: SURFACE,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+  },
+  title: { flex: 1, fontFamily: FONT_BOLD, color: WHITE, fontSize: 22, letterSpacing: 0.3 },
+
+  area: { flex: 1, backgroundColor: BLACK },
+  webview: { flex: 1, backgroundColor: BLACK },
+
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  loadingInner: { alignItems: 'center', maxWidth: 320 },
+  coverBox: {
+    borderRadius: 28,
+    borderWidth: 1,
+    overflow: 'hidden',
+    backgroundColor: SURFACE,
   },
   loadingTitle: {
+    fontFamily: FONT_BOLD,
     color: WHITE,
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 20,
+    fontSize: 26,
+    marginTop: 18,
     textAlign: 'center',
   },
-  loadingText: { color: LOADING_TEXT, fontSize: 14, marginTop: 6 },
+  loadingText: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 15, marginTop: 4 },
+  barTrack: {
+    width: BAR_TRACK,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+    marginTop: 18,
+  },
+  barFill: {
+    width: BAR_SIZE,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: ACCENT,
+  },
+
   floatingBack: {
     position: 'absolute',
     top: 12,
@@ -297,7 +394,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(20,17,31,0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -308,10 +407,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(20,17,31,0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  message: { color: ERROR, fontSize: 16, textAlign: 'center' },
+  message: { fontFamily: FONT_SEMI, color: ERROR, fontSize: 16, textAlign: 'center' },
 });
