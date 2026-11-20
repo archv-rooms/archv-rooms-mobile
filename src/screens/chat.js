@@ -9,6 +9,12 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import Animated, {
+  FadeInDown,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Rajdhani_600SemiBold, Rajdhani_700Bold } from '@expo-google-fonts/rajdhani';
@@ -24,6 +30,8 @@ import {
   enviarMensagem as sendMessage,
 } from '../services/chat';
 import { colorFor, statusInfo } from '../services/friendHelpers';
+import FadeIn from '../components/FadeIn';
+import { Avatar } from './profile';
 import {
   FONT_SEMI,
   FONT_BOLD,
@@ -45,6 +53,25 @@ function formatTime(value) {
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
+// Botão de enviar com efeito leve ao toque
+function SendButton({ onPress, enabled }) {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  return (
+    <Pressable
+      onPressIn={() => { scale.value = withSpring(0.9, { damping: 18, stiffness: 300 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 18, stiffness: 300 }); }}
+      onPress={onPress}
+      disabled={!enabled}
+    >
+      <Animated.View style={[styles.sendButton, !enabled && styles.sendButtonOff, animatedStyle]}>
+        <Ionicons name="send" size={18} color={enabled ? WHITE : TEXT_MUTED} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function ChatScreen({ navigation, route }) {
   const { friend } = route.params;
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
@@ -57,6 +84,7 @@ export default function ChatScreen({ navigation, route }) {
 
   const name = friend.username || friend.name || 'User';
   const color = colorFor(name);
+  const photo = friend.avatar || null;
   const info = statusInfo(friend);
   const offline = friend.status === 'offline';
   const canSend = text.trim() !== '' && !error;
@@ -107,20 +135,32 @@ export default function ChatScreen({ navigation, route }) {
   function renderMessage({ item, index }) {
     const isMine = item.senderId !== friend.id;
     const prev = messages[index - 1];
+    const next = messages[index + 1];
     const sameSenderAsPrev = prev && (prev.senderId !== friend.id) === isMine;
+    const lastOfGroup = !next || (next.senderId !== friend.id) !== isMine;
     const time = formatTime(item.createdAt);
 
     return (
-      <View
+      <Animated.View
+        entering={FadeInDown.duration(240)}
         style={[
-          styles.bubble,
-          isMine ? styles.mine : styles.theirs,
+          styles.messageRow,
+          isMine ? styles.rowMine : styles.rowTheirs,
           { marginTop: sameSenderAsPrev ? 3 : 10 },
         ]}
       >
-        <Text style={styles.bubbleText}>{item.content}</Text>
-        {time !== '' && <Text style={[styles.time, isMine && { color: 'rgba(255,255,255,0.7)' }]}>{time}</Text>}
-      </View>
+        {!isMine && (
+          <View style={styles.sideSlot}>
+            {lastOfGroup && <Avatar profile={{ name, color, photo }} size={28} />}
+          </View>
+        )}
+        <View style={[styles.bubble, isMine ? styles.mine : styles.theirs]}>
+          <Text style={styles.bubbleText}>{item.content}</Text>
+          {time !== '' && (
+            <Text style={[styles.time, isMine && { color: 'rgba(255,255,255,0.7)' }]}>{time}</Text>
+          )}
+        </View>
+      </Animated.View>
     );
   }
 
@@ -133,24 +173,20 @@ export default function ChatScreen({ navigation, route }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         {/* ---------- Cabeçalho ---------- */}
-        <View style={styles.top}>
+        <FadeIn style={styles.top}>
           <Pressable onPress={() => navigation.goBack()} style={styles.back}>
             <Ionicons name="arrow-back" size={22} color={WHITE} />
           </Pressable>
 
           <View style={{ width: 42, height: 42 }}>
-            <View
-              style={[
-                styles.avatar,
-                {
-                  backgroundColor: color + '30',
-                  borderColor: info && !offline ? color : color + '66',
-                  borderWidth: info && !offline ? 2.5 : 1.5,
-                },
-              ]}
-            >
-              <Text style={[styles.avatarText, { color }]}>{name.trim().charAt(0).toUpperCase()}</Text>
-            </View>
+            <Avatar
+              profile={{
+                name,
+                photo,
+                color: info && !offline ? color : color + '66',
+              }}
+              size={42}
+            />
             {info && <View style={[styles.statusDot, { backgroundColor: info.dot }]} />}
           </View>
 
@@ -169,7 +205,7 @@ export default function ChatScreen({ navigation, route }) {
               <Text style={styles.playText}>Jogar</Text>
             </Pressable>
           )}
-        </View>
+        </FadeIn>
 
         {error && (
           <View style={styles.errorBox}>
@@ -189,12 +225,12 @@ export default function ChatScreen({ navigation, route }) {
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 8 }}
           ListEmptyComponent={
             !error ? (
-              <View style={styles.empty}>
+              <FadeIn style={styles.empty}>
                 <View style={styles.emptyIcon}>
                   <Ionicons name="chatbubbles-outline" size={34} color={TEXT_MUTED} />
                 </View>
                 <Text style={styles.emptyText}>Diga oi para {name}</Text>
-              </View>
+              </FadeIn>
             ) : null
           }
         />
@@ -212,13 +248,7 @@ export default function ChatScreen({ navigation, route }) {
             onBlur={() => setFocused(false)}
             returnKeyType="send"
           />
-          <Pressable
-            style={[styles.sendButton, !canSend && styles.sendButtonOff]}
-            onPress={send}
-            disabled={!canSend}
-          >
-            <Ionicons name="send" size={18} color={canSend ? WHITE : TEXT_MUTED} />
-          </Pressable>
+          <SendButton onPress={send} enabled={canSend} />
         </View>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -242,14 +272,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontFamily: FONT_BOLD, fontSize: 20 },
   statusDot: {
     position: 'absolute',
     right: -1,
@@ -286,20 +308,23 @@ const styles = StyleSheet.create({
   },
   errorText: { fontFamily: FONT_SEMI, color: ERROR, fontSize: 14 },
 
+  messageRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, maxWidth: '86%' },
+  rowMine: { alignSelf: 'flex-end' },
+  rowTheirs: { alignSelf: 'flex-start' },
+  sideSlot: { width: 28 },
+
   bubble: {
-    maxWidth: '78%',
+    flexShrink: 1,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingTop: 8,
     paddingBottom: 6,
   },
   mine: {
-    alignSelf: 'flex-end',
     backgroundColor: BUTTON_PURPLE,
     borderBottomRightRadius: 6,
   },
   theirs: {
-    alignSelf: 'flex-start',
     backgroundColor: SURFACE_LIGHT,
     borderBottomLeftRadius: 6,
   },
