@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { avatarColor } from '../services/roomHelpers';
+import { Avatar } from '../screens/profile';
 import { FONT_SEMI, FONT_BOLD, SURFACE, WHITE, TEXT_MUTED, GREEN, SOFT } from '../constants/palette';
 
 // One player in the lobby
@@ -13,9 +14,7 @@ export default function MemberRow({ member }) {
 
   return (
     <View style={styles.member}>
-      <View style={[styles.avatar, { backgroundColor: color + '30', borderColor: color }]}>
-        <Text style={[styles.avatarText, { color }]}>{member.name.trim().charAt(0).toUpperCase()}</Text>
-      </View>
+      <Avatar profile={{ name: member.name, color, photo: member.avatar || null }} size={36} />
       <Text style={styles.memberName} numberOfLines={1}>
         {member.isMe ? 'você' : member.name}
       </Text>
@@ -61,7 +60,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarEmpty: { borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1.5, backgroundColor: 'transparent' },
-  avatarText: { fontFamily: FONT_BOLD, fontSize: 17 },
   memberName: { flex: 1, fontFamily: FONT_BOLD, color: WHITE, fontSize: 18 },
   waitingText: { flex: 1, fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 16 },
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },

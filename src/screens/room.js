@@ -216,6 +216,7 @@ export default function LobbyScreen({ navigation, route }) {
   const members = (room.members || []).map((m) => ({
     id: m.id,
     name: m.username || m.name || 'jogador',
+    avatar: m.avatar || null,
     isHost: m.id === room.hostId,
     isMe: m.id === meId,
     ready: readyIds.includes(m.id),
