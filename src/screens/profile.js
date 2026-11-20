@@ -41,6 +41,23 @@ const AVATAR_COLORS = ['#8E7CF0', '#FF6B8A', '#3F8CFF', '#FFB23C', '#7CE06B', '#
 const NAME_MAX = 20;
 const BIO_MAX = 80;
 
+// Foto que já está no servidor (link) ou ainda só no celular (arquivo)
+function isRemote(uri) {
+  return typeof uri === 'string' && /^https?:\/\//i.test(uri);
+}
+
+// Envia a foto para o servidor e devolve o link novo
+async function uploadAvatar(uri) {
+  const ext = ((uri.split('?')[0].split('.').pop() || 'jpg') + '').toLowerCase();
+  const type = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+  const form = new FormData();
+  form.append('avatar', { uri, name: 'avatar.' + ext, type });
+  const res = await api.patch('/user/avatar-file', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return res.data && res.data.data && res.data.data.avatar;
+}
+
 // Avatar reutilizável: foto, ou inicial com a cor escolhida
 export function Avatar({ profile, size = 40 }) {
   const color = profile.color || ACCENT;
@@ -113,7 +130,7 @@ export default function ProfileScreen({ navigation }) {
 
       let p = await loadProfile();
 
-      // Nome e username reais da conta (se tiver login)
+      // Nome, username e foto reais da conta (se tiver login)
       let accountUsername = '';
       try {
         const res = await api.get('/user/profile');
@@ -121,6 +138,7 @@ export default function ProfileScreen({ navigation }) {
         if (user) {
           accountUsername = user.username || '';
           if (user.name) p = { ...p, name: user.name.slice(0, NAME_MAX) };
+          if (user.avatar) p = { ...p, photo: user.avatar };
         }
       } catch (e) {}
 
@@ -207,7 +225,8 @@ export default function ProfileScreen({ navigation }) {
 
   function removePhoto() {
     vibrate(15);
-    update({ photo: null });
+    // Volta para a foto que já estava salva (a remoção no servidor ainda não existe)
+    update({ photo: isRemote(saved.photo) ? saved.photo : null });
     setShowAvatar(false);
   }
 
@@ -223,6 +242,24 @@ export default function ProfileScreen({ navigation }) {
         if (status !== 401) {
           showAlert('Aviso', 'Não foi possível salvar o nome na conta. Ele foi salvo só neste celular.');
         }
+      }
+    }
+
+    // Se a foto é nova (arquivo do celular), envia para o servidor
+    if (clean.photo && !isRemote(clean.photo)) {
+      try {
+        const url = await uploadAvatar(clean.photo);
+        if (url) clean.photo = url;
+      } catch (e) {
+        const status = e && e.response && e.response.status;
+        const msg = e && e.response && e.response.data && e.response.data.message;
+        showAlert(
+          'Aviso',
+          'Não foi possível enviar a foto para a conta' +
+            (status ? ' (erro ' + status + ')' : '') +
+            (msg ? ': ' + msg : '') +
+            '. Ela foi salva só neste celular.'
+        );
       }
     }
 
@@ -421,7 +458,7 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.optionText}>Escolher da galeria</Text>
             </Pressable>
 
-            {draft.photo && (
+            {draft.photo && !isRemote(draft.photo) && (
               <Pressable style={[styles.optionButton, styles.optionDanger]} onPress={removePhoto}>
                 <Ionicons name="trash-outline" size={20} color={RED} />
                 <Text style={[styles.optionText, { color: RED }]}>Remover foto</Text>
