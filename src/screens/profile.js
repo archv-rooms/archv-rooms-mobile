@@ -225,8 +225,8 @@ export default function ProfileScreen({ navigation }) {
 
   function removePhoto() {
     vibrate(15);
-    // Volta para a foto que já estava salva (a remoção no servidor ainda não existe)
-    update({ photo: isRemote(saved.photo) ? saved.photo : null });
+    // A foto só é apagada de verdade no servidor ao salvar
+    update({ photo: null });
     setShowAvatar(false);
   }
 
@@ -242,6 +242,20 @@ export default function ProfileScreen({ navigation }) {
         if (status !== 401) {
           showAlert('Aviso', 'Não foi possível salvar o nome na conta. Ele foi salvo só neste celular.');
         }
+      }
+    }
+
+    // Se a foto do servidor foi removida, apaga no servidor
+    if (!clean.photo && isRemote(saved.photo)) {
+      try {
+        await api.delete('/user/avatar');
+      } catch (e) {
+        const status = e && e.response && e.response.status;
+        showAlert(
+          'Aviso',
+          'Não foi possível remover a foto da conta' + (status ? ' (erro ' + status + ')' : '') + '. Ela continua na conta.'
+        );
+        clean.photo = saved.photo;
       }
     }
 
@@ -458,7 +472,7 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.optionText}>Escolher da galeria</Text>
             </Pressable>
 
-            {draft.photo && !isRemote(draft.photo) && (
+            {!!draft.photo && (
               <Pressable style={[styles.optionButton, styles.optionDanger]} onPress={removePhoto}>
                 <Ionicons name="trash-outline" size={20} color={RED} />
                 <Text style={[styles.optionText, { color: RED }]}>Remover foto</Text>
