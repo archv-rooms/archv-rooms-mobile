@@ -126,11 +126,25 @@ export default function HomeScreen({ navigation }) {
   // Reload the saves and the profile every time this screen comes back into focus
   useFocusEffect(
     useCallback(() => {
-      AsyncStorage.getItem(TOKEN_KEY)
-        .then((token) => setIsGuest(!token))
-        .catch(() => {});
       listSaves().then(setSaves);
-      loadProfile().then(setProfile);
+
+      loadProfile().then((p) => {
+        setProfile(p);
+        AsyncStorage.getItem(TOKEN_KEY)
+          .then((token) => {
+            setIsGuest(!token);
+            if (!token) return;
+            // Foto real da conta (servidor)
+            api
+              .get('/user/profile')
+              .then((res) => {
+                const user = res.data && res.data.data && res.data.data.user;
+                if (user && user.avatar) setProfile((current) => ({ ...current, photo: user.avatar }));
+              })
+              .catch(() => {});
+          })
+          .catch(() => {});
+      });
     }, [])
   );
 
