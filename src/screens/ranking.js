@@ -44,6 +44,10 @@ function getName(item) {
   return (item.user && (item.user.username || item.user.name)) || 'Jogador';
 }
 
+function getPhoto(item) {
+  return (item.user && item.user.avatar) || null;
+}
+
 // Podium card (index 0 = 1st place, 1 = 2nd, 2 = 3rd)
 function PodiumCard({ item, index }) {
   const medal = MEDALS[index];
@@ -63,7 +67,7 @@ function PodiumCard({ item, index }) {
       />
       <View style={[styles.accentBar, { backgroundColor: medal }]} />
       <Text style={[styles.podiumRank, { color: medal }]}>{index + 1}</Text>
-      <Avatar profile={{ name, color: medal }} size={size} />
+      <Avatar profile={{ name, color: medal, photo: getPhoto(item) }} size={size} />
       <Text style={styles.podiumName} numberOfLines={1}>{name}</Text>
       <Text style={styles.podiumTime}>{formatTime(item.totalDuration)}</Text>
     </Animated.View>
@@ -84,7 +88,7 @@ function RankRow({ item, index }) {
       >
         <Animated.View style={[styles.row, animatedStyle]}>
           <Text style={styles.posText}>{item.position}</Text>
-          <Avatar profile={{ name: getName(item) }} size={38} />
+          <Avatar profile={{ name: getName(item), photo: getPhoto(item) }} size={38} />
           <Text style={styles.name} numberOfLines={1}>{getName(item)}</Text>
           <Text style={styles.time}>{formatTime(item.totalDuration)}</Text>
         </Animated.View>
