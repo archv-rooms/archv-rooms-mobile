@@ -10,6 +10,7 @@ import {
   Platform,
   RefreshControl,
   Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -63,8 +64,8 @@ const GLOW =
 
 const STATUS_ORDER = { playing: 0, online: 1, offline: 2 };
 
-// Avatar: colored ring + dot when the friend is online/playing, faded when offline
-function Avatar({ name, size = 42, info }) {
+// Avatar: foto (se tiver) ou inicial, com anel colorido e ponto quando está online/jogando
+function Avatar({ name, size = 42, info, photo }) {
   const color = colorFor(name);
   const offline = info && info.dot === OFFLINE_DOT;
   const ring = info && !offline;
@@ -83,14 +84,21 @@ function Avatar({ name, size = 42, info }) {
           },
         ]}
       >
-        <Text
-          style={[
-            styles.avatarText,
-            { color, fontSize: Math.round(size * 0.48), opacity: offline ? 0.55 : 1 },
-          ]}
-        >
-          {(name || '?').trim().charAt(0).toUpperCase()}
-        </Text>
+        {photo ? (
+          <Image
+            source={{ uri: photo }}
+            style={{ width: '100%', height: '100%', opacity: offline ? 0.6 : 1 }}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.avatarText,
+              { color, fontSize: Math.round(size * 0.48), opacity: offline ? 0.55 : 1 },
+            ]}
+          >
+            {(name || '?').trim().charAt(0).toUpperCase()}
+          </Text>
+        )}
       </View>
       {info && <View style={[styles.onlineDot, { backgroundColor: info.dot }]} />}
     </View>
@@ -373,7 +381,7 @@ export default function FriendsScreen({ navigation }) {
                   <AnimatedRow key={'search-' + user.id} index={i}>
                     <View style={styles.row}>
                       <Pressable onPress={() => openUser(user, null, false)} hitSlop={6}>
-                        <Avatar name={displayName(user)} />
+                        <Avatar name={displayName(user)} photo={user.avatar} />
                       </Pressable>
                       <Text style={styles.name} numberOfLines={1}>
                         {displayName(user)}
@@ -413,7 +421,7 @@ export default function FriendsScreen({ navigation }) {
                         <AnimatedRow key={'request-' + animKey + '-' + request.id} index={i}>
                           <View style={[styles.row, styles.rowRequest]}>
                             <Pressable onPress={() => openUser(sender, null, false)} hitSlop={6}>
-                              <Avatar name={name} size={36} />
+                              <Avatar name={name} size={36} photo={sender.avatar} />
                             </Pressable>
                             <Text style={styles.name} numberOfLines={1}>
                               {name}
@@ -464,7 +472,7 @@ export default function FriendsScreen({ navigation }) {
                           scale={0.97}
                         >
                           <Pressable onPress={() => openUser(friend, info, true)} hitSlop={6}>
-                            <Avatar name={displayName(friend)} info={info} />
+                            <Avatar name={displayName(friend)} info={info} photo={friend.avatar} />
                           </Pressable>
                           <View style={styles.friendInfo}>
                             <Text style={styles.nameInline} numberOfLines={1}>
@@ -506,7 +514,7 @@ export default function FriendsScreen({ navigation }) {
               <>
                 <View style={styles.modalHandle} />
                 <View style={{ alignItems: 'center' }}>
-                  <Avatar name={displayName(selUser)} size={88} info={selInfo} />
+                  <Avatar name={displayName(selUser)} size={88} info={selInfo} photo={selUser.avatar} />
                   <Text style={styles.modalName} numberOfLines={1}>
                     {selUser.name || displayName(selUser)}
                   </Text>
@@ -648,6 +656,7 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   avatarText: { fontFamily: FONT_BOLD },
   onlineDot: {
