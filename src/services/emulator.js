@@ -20,10 +20,29 @@ export function getCore(consoleName) {
   return CORES[(consoleName || '').toUpperCase()] || 'nes';
 }
 
-export function buildHtml(game) {
+// online = true: Netplay ligado (usuário com conta)
+// online = false: Netplay desligado (convidado, sem login)
+export function buildHtml(game, online = true) {
   const core = JSON.stringify(getCore(game.console));
   const url = JSON.stringify(game.fileUrl || '').replace(/</g, '\\u003c');
   const gameId = Number(game.id) || 1;
+
+  const netplay = online
+    ? `
+  window.EJS_EXPERIMENTAL_NETPLAY = true;
+
+  // Netplay (jogo online)
+  window.EJS_gameID = ${gameId};
+  window.EJS_netplayServer = '${NETPLAY_URL}';
+  window.EJS_netplayUrl = '${NETPLAY_URL}';
+  window.EJS_oldCores = true;
+  window.EJS_netplayICEServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+`
+    : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -43,19 +62,7 @@ export function buildHtml(game) {
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/latest/data/';
   window.EJS_startOnLoaded = true;
   window.EJS_DEBUG_XX = true;
-  window.EJS_EXPERIMENTAL_NETPLAY = true;
-
-  // Netplay (jogo online)
-  window.EJS_gameID = ${gameId};
-  window.EJS_netplayServer = '${NETPLAY_URL}';
-  window.EJS_netplayUrl = '${NETPLAY_URL}';
-  window.EJS_oldCores = true;
-  window.EJS_netplayICEServers = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
-  ];
-
+${netplay}
   // Tells the app when the game has really started
   window.EJS_onGameStart = function () {
     var msg = 'ejs-game-started';

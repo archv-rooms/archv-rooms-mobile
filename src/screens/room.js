@@ -5,6 +5,7 @@ import {
   TextInput,
   Pressable,
   ScrollView,
+  Modal,
   StyleSheet,
   Platform,
   KeyboardAvoidingView,
@@ -35,6 +36,44 @@ import {
   AMBER,
 } from '../constants/palette';
 
+const HOST_STEPS = [
+  {
+    title: 'Inicie o jogo',
+    text: 'Quando todos estiverem prontos, toque em "Iniciar jogo". O jogo abre para todos.',
+  },
+  {
+    title: 'Abra o Netplay',
+    text: 'Dentro do jogo, abra o menu do emulador (as três linhas no canto da tela) e toque em Netplay.',
+  },
+  {
+    title: 'Crie a sala',
+    text: 'Toque em "Criar uma Sala", escolha um nome e uma senha e coloque seu nome de jogador.',
+  },
+  {
+    title: 'Avise os amigos',
+    text: 'Antes de iniciar, combine o nome e a senha no chat do Lobby para os outros entrarem.',
+  },
+];
+
+const GUEST_STEPS = [
+  {
+    title: 'Marque "Estou pronto"',
+    text: 'Toque no botão e espere o dono da sala iniciar o jogo.',
+  },
+  {
+    title: 'Abra o Netplay',
+    text: 'Quando o jogo abrir, abra o menu do emulador (as três linhas no canto da tela) e toque em Netplay.',
+  },
+  {
+    title: 'Entre na sala',
+    text: 'Na aba "Salas", toque na sala que o dono criou e digite a senha que ele combinou no chat.',
+  },
+  {
+    title: 'Jogue',
+    text: 'Quando todos entrarem, o dono começa a partida e vocês jogam juntos.',
+  },
+];
+
 export default function LobbyScreen({ navigation, route }) {
   const [fontsLoaded] = useFonts({ Rajdhani_600SemiBold, Rajdhani_700Bold });
   const [room, setRoom] = useState(route.params.room);
@@ -43,6 +82,7 @@ export default function LobbyScreen({ navigation, route }) {
   const [meId, setMeId] = useState(null);
   const [text, setText] = useState('');
   const [focused, setFocused] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const leftRef = useRef(false);
   const closedRef = useRef(false);
@@ -166,6 +206,11 @@ export default function LobbyScreen({ navigation, route }) {
     }
   }
 
+  function openHelp() {
+    vibrate(15);
+    setShowHelp(true);
+  }
+
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: BG_TOP }} />;
 
   const members = (room.members || []).map((m) => ({
@@ -196,6 +241,7 @@ export default function LobbyScreen({ navigation, route }) {
     hint = me && me.ready ? 'Aguardando o anfitrião iniciar' : 'Toque em "Estou pronto" quando quiser jogar';
   }
 
+  const steps = isHost ? HOST_STEPS : GUEST_STEPS;
   const slots = Array.from({ length: room.maxPlayers }).map((_, i) => members[i] || null);
   const recent = messages.slice(-5);
 
@@ -282,6 +328,12 @@ export default function LobbyScreen({ navigation, route }) {
         </View>
 
         <Text style={styles.hint}>{hint}</Text>
+
+        <Pressable style={styles.helpButton} onPress={openHelp}>
+          <Ionicons name="help-circle-outline" size={18} color={ACCENT} />
+          <Text style={styles.helpText}>Como jogar online</Text>
+        </Pressable>
+
         <View style={styles.actions}>
           <Pressable style={styles.leaveButton} onPress={leave}>
             <Ionicons name="exit-outline" size={18} color={RED} />
@@ -317,6 +369,50 @@ export default function LobbyScreen({ navigation, route }) {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showHelp}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowHelp(false)}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Como jogar online</Text>
+                <Text style={styles.cardSub}>
+                  {isHost ? 'Passos para o dono da sala' : 'Passos para quem entra na sala'}
+                </Text>
+              </View>
+              <Pressable onPress={() => setShowHelp(false)} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={WHITE} />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 320 }}>
+              {steps.map((step, i) => (
+                <View key={step.title} style={styles.step}>
+                  <View style={[styles.stepNumber, { backgroundColor: accent }]}>
+                    <Text style={styles.stepNumberText}>{i + 1}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.stepTitle}>{step.title}</Text>
+                    <Text style={styles.stepText}>{step.text}</Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <Pressable
+              style={[styles.understoodButton, { backgroundColor: accent }]}
+              onPress={() => setShowHelp(false)}
+            >
+              <Text style={styles.mainText}>Entendi</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -416,8 +512,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 12,
+    marginBottom: 4,
+  },
+  helpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     marginBottom: 8,
   },
+  helpText: { fontFamily: FONT_BOLD, color: ACCENT, fontSize: 15 },
   actions: { flexDirection: 'row', gap: 10 },
   leaveButton: {
     flexDirection: 'row',
@@ -449,4 +556,57 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(74,222,128,0.4)',
   },
   mainText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 17 },
+
+  // ---------- Janela "Como jogar online" ----------
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10,8,18,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: SURFACE,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    padding: 20,
+  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  cardTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 22 },
+  cardSub: { fontFamily: FONT_SEMI, color: TEXT_MUTED, fontSize: 14, marginTop: 2 },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  step: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  stepNumber: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumberText: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 16 },
+  stepTitle: { fontFamily: FONT_BOLD, color: WHITE, fontSize: 17 },
+  stepText: {
+    fontFamily: FONT_SEMI,
+    color: TEXT_MUTED,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 2,
+  },
+  understoodButton: {
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
 });

@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
-import api from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api, { TOKEN_KEY } from '../services/api';
 import { addSave, getSaveState } from '../services/saves';
 import { buildHtml, SAVE_JS, buildLoadJs } from '../services/emulator';
 import { useLandscape } from '../hooks/useLandscape';
@@ -33,9 +34,26 @@ export default function GameScreen({ navigation, route }) {
   const { width, height } = useWindowDimensions();
   const landscape = width > height;
   const [loading, setLoading] = useState(true);
+  // null = ainda checando o login; true = com conta (Netplay ligado); false = convidado (sem Netplay)
+  const [online, setOnline] = useState(null);
   const webRef = useRef(null);
   const slotRef = useRef(1);
   const sessionIdRef = useRef(null);
+
+  // Verifica se há login antes de montar o emulador
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      let token = null;
+      try {
+        token = await AsyncStorage.getItem(TOKEN_KEY);
+      } catch (e) {}
+      if (active) setOnline(!!token);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Ranking: começa a contar o tempo de jogo
   async function startSession() {
@@ -154,7 +172,7 @@ export default function GameScreen({ navigation, route }) {
     }
   }
 
-  let content;
+  let content = null;
 
   if (!game || !game.fileUrl) {
     content = (
@@ -162,9 +180,12 @@ export default function GameScreen({ navigation, route }) {
         <Text style={styles.message}>Arquivo do jogo não disponível.</Text>
       </View>
     );
+  } else if (online === null) {
+    // Ainda checando o login: a tela de carregando fica por cima
+    content = null;
   } else if (Platform.OS === 'web') {
     content = React.createElement('iframe', {
-      srcDoc: buildHtml(game),
+      srcDoc: buildHtml(game, online),
       title: game.title || 'Jogo',
       allow: 'autoplay; fullscreen; gamepad',
       allowFullScreen: true,
@@ -176,7 +197,7 @@ export default function GameScreen({ navigation, route }) {
         ref={webRef}
         style={styles.webview}
         originWhitelist={['*']}
-        source={{ html: buildHtml(game), baseUrl: 'https://archv-rooms-service.onrender.com' }}
+        source={{ html: buildHtml(game, online), baseUrl: 'https://archv-rooms-service.onrender.com' }}
         javaScriptEnabled
         domStorageEnabled
         allowsInlineMediaPlayback
