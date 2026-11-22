@@ -2,19 +2,15 @@ import React, { useState } from 'react';
 import { View, Text, Image, Animated, Pressable } from 'react-native';
 import api from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
-import { FadeIn, PrimaryButton, authStyles as s } from '../components/auth-kit';
+import { FadeIn, AuthField, PrimaryButton, authStyles as s } from '../components/auth-kit';
 import AuthLayout from '../components/AuthLayout';
-import PasswordField from '../components/PasswordField';
 import StatusMessage from '../components/StatusMessage';
 import useShake from '../hooks/useShake';
 
-export default function ResetPasswordScreen({ route, navigation }) {
-  const token = route.params && route.params.token;
-
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
+export default function ForgotPasswordScreen({ navigation }) {
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
 
   const { shakeStyle, shake } = useShake();
@@ -24,23 +20,11 @@ export default function ResetPasswordScreen({ route, navigation }) {
     shake();
   }
 
-  async function handleReset() {
+  async function handleSend() {
     if (loading) return;
 
-    if (!token) {
-      showError('Link inválido ou expirado.');
-      return;
-    }
-    if (!password || !confirm) {
-      showError('Preencha os dois campos.');
-      return;
-    }
-    if (password.length < 6) {
-      showError('A senha precisa ter pelo menos 6 caracteres.');
-      return;
-    }
-    if (password !== confirm) {
-      showError('As senhas não são iguais.');
+    if (!email.trim()) {
+      showError('Digite o seu e-mail.');
       return;
     }
 
@@ -48,8 +32,8 @@ export default function ResetPasswordScreen({ route, navigation }) {
     setLoading(true);
 
     try {
-      await api.post('/auth/reset-password', { token, password }, { timeout: 90000 });
-      setDone(true);
+      await api.post('/auth/forgot-password', { email: email.trim() }, { timeout: 90000 });
+      setSent(true);
     } catch (err) {
       showError(getApiErrorMessage(err));
     } finally {
@@ -65,44 +49,37 @@ export default function ResetPasswordScreen({ route, navigation }) {
     <AuthLayout>
       <FadeIn style={s.header}>
         <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
-        <Text style={s.title}>Nova senha</Text>
+        <Text style={s.title}>Esqueceu a senha?</Text>
         <Text style={[s.subtitle, { paddingHorizontal: 8 }]}>
-          Escolha uma nova senha para a sua conta.
+          Digite o seu e-mail e enviaremos um link para criar uma nova senha.
         </Text>
       </FadeIn>
 
       <FadeIn delay={100}>
-        {done ? (
+        {sent ? (
           <>
             <StatusMessage
               icon="checkmark-circle-outline"
               iconSize={20}
-              message="Senha redefinida com sucesso!"
+              message="Se o e-mail existir, enviamos um link para redefinir a senha."
               style={{ marginBottom: 16 }}
             />
-            <PrimaryButton label="Ir para o login" onPress={goToLogin} />
+            <PrimaryButton label="Voltar ao login" onPress={goToLogin} />
           </>
         ) : (
           <>
             <Animated.View style={shakeStyle}>
-              <PasswordField
-                value={password}
+              <AuthField
+                icon="mail-outline"
+                placeholder="E-mail"
+                value={email}
                 onChangeText={(t) => {
-                  setPassword(t);
+                  setEmail(t);
                   setError('');
                 }}
-                placeholder="Nova senha"
+                keyboardType="email-address"
               />
-              <PasswordField
-                value={confirm}
-                onChangeText={(t) => {
-                  setConfirm(t);
-                  setError('');
-                }}
-                placeholder="Confirmar nova senha"
-                onSubmitEditing={handleReset}
-              />
-              <PrimaryButton label="Salvar senha" onPress={handleReset} loading={loading} />
+              <PrimaryButton label="Enviar link" onPress={handleSend} loading={loading} />
             </Animated.View>
 
             {error !== '' && (
