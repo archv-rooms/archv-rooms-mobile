@@ -57,8 +57,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "build": "expo export -p web && node scripts/fix-assets.js",
-    "deploy": "netlify deploy --prod --site 186e103a-31bc-490d-9b74-19686e3197c2"
+    "build": "expo export -p web && node scripts/fix-assets.js"
   },
   "private": true
 }
