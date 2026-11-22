@@ -7,6 +7,7 @@ import SignInScreen from './src/screens/sign-in';
 import SignUpScreen from './src/screens/sign-up';
 import ForgotPasswordScreen from './src/screens/forgot-password';
 import ChooseUsernameScreen from './src/screens/choose-username';
+import VerifyEmailScreen from './src/screens/verify-email';
 import HomeScreen from './src/screens/home';
 import GameScreen from './src/screens/game';
 import FriendsScreen from './src/screens/friends';
@@ -24,6 +25,15 @@ import api, { TOKEN_KEY } from './src/services/api';
 
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef();
+
+const linking = {
+  prefixes: ['https://archv-rooms-web.vercel.app', 'archvroomsmobile://'],
+  config: {
+    screens: {
+      VerifyEmail: 'verify-email',
+    },
+  },
+};
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState('SignIn');
@@ -79,6 +89,7 @@ export default function App() {
     <AlertProvider>
       <NavigationContainer
         ref={navigationRef}
+        linking={linking}
         onReady={updateCurrentRoute}
         onStateChange={updateCurrentRoute}
       >
@@ -89,6 +100,7 @@ export default function App() {
           <Stack.Screen name="SignIn" component={SignInScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
           <Stack.Screen name="ChooseUsername" component={ChooseUsernameScreen} />
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="Home" component={HomeScreen} />
