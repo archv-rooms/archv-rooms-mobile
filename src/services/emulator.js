@@ -61,7 +61,6 @@ export function buildHtml(game, online = true) {
   window.EJS_gameUrl = ${url};
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/latest/data/';
   window.EJS_startOnLoaded = true;
-  window.EJS_DEBUG_XX = true;
 
   // Cor do menu (roxo do app)
   window.EJS_color = '#8E7CF0';
