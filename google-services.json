@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1031618010489",
+    "project_id": "archv-rooms-d45c3",
+    "storage_bucket": "archv-rooms-d45c3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1031618010489:android:dd75bd251d9847a6ece3a8",
+        "android_client_info": {
+          "package_name": "com.archv.rooms"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA68OwHV0LyQ28_t9BcLjJqTkyeq6zUPck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

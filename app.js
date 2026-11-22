@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,6 +25,7 @@ import OnboardingScreen, { ONBOARDING_KEY } from './src/screens/onboarding';
 import BottomTabBar from './src/components/BottomTabBar';
 import { AlertProvider } from './src/components/AppModal';
 import api, { TOKEN_KEY } from './src/services/api';
+import { registerForPush } from './src/services/push';
 
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef();
@@ -41,9 +43,30 @@ const linking = {
 // Espaço reservado embaixo em todas as telas
 const TAB_BAR_SPACE = 96;
 
+// Tela que abre ao tocar na notificação, conforme o tipo
+const PUSH_SCREEN = {
+  message: 'Friends',
+  friend_request: 'Friends',
+  friend_accepted: 'Friends',
+  room_full: 'Rooms',
+};
+
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState('SignIn');
   const usernameChecked = useRef(false);
+  const pushRegistered = useRef(false);
+
+  // Ao tocar numa notificação, abre a tela correspondente
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data || {};
+      const screen = PUSH_SCREEN[data.type];
+      if (screen && navigationRef.isReady()) {
+        navigationRef.navigate(screen);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   // Se a conta não tem username (login Google/GitHub), abre a tela para escolher
   async function needsUsername() {
@@ -61,6 +84,17 @@ export default function App() {
     }
   }
 
+  // Registra o aparelho para receber notificações (uma vez por sessão, só com login)
+  async function setupPush() {
+    if (pushRegistered.current) return;
+    try {
+      const token = await AsyncStorage.getItem(TOKEN_KEY);
+      if (!token) return;
+      pushRegistered.current = true;
+      await registerForPush();
+    } catch (e) {}
+  }
+
   async function updateCurrentRoute() {
     const route = navigationRef.getCurrentRoute();
     if (!route) return;
@@ -71,6 +105,8 @@ export default function App() {
         navigationRef.reset({ index: 0, routes: [{ name: 'ChooseUsername' }] });
         return;
       }
+
+      setupPush();
 
       // First time reaching Home after login: show the onboarding once
       let seen = null;
@@ -85,6 +121,7 @@ export default function App() {
 
   async function signOut() {
     usernameChecked.current = false;
+    pushRegistered.current = false;
     try {
       await AsyncStorage.removeItem(TOKEN_KEY);
     } catch (e) {}
