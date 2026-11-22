@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,6 +9,7 @@ import SignUpScreen from './src/screens/sign-up';
 import ForgotPasswordScreen from './src/screens/forgot-password';
 import ChooseUsernameScreen from './src/screens/choose-username';
 import VerifyEmailScreen from './src/screens/verify-email';
+import ResetPasswordScreen from './src/screens/reset-password';
 import HomeScreen from './src/screens/home';
 import GameScreen from './src/screens/game';
 import FriendsScreen from './src/screens/friends';
@@ -31,9 +33,13 @@ const linking = {
   config: {
     screens: {
       VerifyEmail: 'verify-email',
+      ResetPassword: 'reset-password',
     },
   },
 };
+
+// Espaço reservado embaixo em todas as telas
+const TAB_BAR_SPACE = 96;
 
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState('SignIn');
@@ -93,27 +99,36 @@ export default function App() {
         onReady={updateCurrentRoute}
         onStateChange={updateCurrentRoute}
       >
-        <Stack.Navigator
-          initialRouteName="SignIn"
-          screenOptions={{ headerShown: false, animation: 'fade' }}
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: '#14111F',
+            paddingBottom: TAB_BAR_SPACE,
+          }}
         >
-          <Stack.Screen name="SignIn" component={SignInScreen} />
-          <Stack.Screen name="SignUp" component={SignUpScreen} />
-          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-          <Stack.Screen name="ChooseUsername" component={ChooseUsernameScreen} />
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Game" component={GameScreen} />
-          <Stack.Screen name="Friends" component={FriendsScreen} />
-          <Stack.Screen name="Rooms" component={RoomsScreen} />
-          <Stack.Screen name="Lobby" component={LobbyScreen} />
-          <Stack.Screen name="Chat" component={ChatScreen} />
-          <Stack.Screen name="Profile" component={ProfileScreen} />
-          <Stack.Screen name="Ranking" component={RankingScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="About" component={AboutScreen} />
-        </Stack.Navigator>
+          <Stack.Navigator
+            initialRouteName="SignIn"
+            screenOptions={{ headerShown: false, animation: 'fade' }}
+          >
+            <Stack.Screen name="SignIn" component={SignInScreen} />
+            <Stack.Screen name="SignUp" component={SignUpScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+            <Stack.Screen name="ChooseUsername" component={ChooseUsernameScreen} />
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Game" component={GameScreen} />
+            <Stack.Screen name="Friends" component={FriendsScreen} />
+            <Stack.Screen name="Rooms" component={RoomsScreen} />
+            <Stack.Screen name="Lobby" component={LobbyScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="Ranking" component={RankingScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="About" component={AboutScreen} />
+          </Stack.Navigator>
+        </View>
 
         <BottomTabBar
           currentRoute={currentRoute}

@@ -36,6 +36,11 @@
               "scheme": "https",
               "host": "archv-rooms-web.vercel.app",
               "pathPrefix": "/verify-email"
+            },
+            {
+              "scheme": "https",
+              "host": "archv-rooms-web.vercel.app",
+              "pathPrefix": "/reset-password"
             }
           ],
           "category": ["BROWSABLE", "DEFAULT"]
