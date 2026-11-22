@@ -3,7 +3,6 @@ import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, FONT, PressableScale, authStyles as s } from './auth-kit';
 import { showAlert } from './AppModal';
@@ -13,12 +12,6 @@ const BACKEND_URL = 'https://archv-rooms-service.onrender.com';
 
 // Link que o backend usa para voltar ao app
 function getReturnUrl() {
-  const host = Constants.expoConfig?.hostUri;
-  // Rodando pelo Metro/túnel (Expo Go): usa o link exp://
-  if (host) {
-    return `exp://${host}/--/auth`;
-  }
-  // App instalado: usa o esquema do app
   return Linking.createURL('auth');
 }
 
