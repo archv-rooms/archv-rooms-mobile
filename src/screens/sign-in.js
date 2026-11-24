@@ -29,7 +29,8 @@ export default function SignInScreen({ navigation }) {
       await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
       goHome();
     } catch (e) {
-      showAlert('Erro', 'Nick ou senha incorretos.');
+      const msg = e && e.response && e.response.data && e.response.data.message;
+      showAlert('Erro', msg || (e && e.message) || 'Erro desconhecido.');
     }
     setBusy(false);
   }

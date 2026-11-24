@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { View, Text, Image, Animated, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import api from '../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import api, { TOKEN_KEY } from '../services/api';
 import { getApiErrorMessage } from '../services/apiError';
 import { showAlert } from '../components/AppModal';
 import { COLORS, FONT, FadeIn, AuthField, PrimaryButton, authStyles as s } from '../components/auth-kit';
 import AuthLayout from '../components/AuthLayout';
 import PasswordField from '../components/PasswordField';
 import GithubLogin from '../components/GithubLogin';
-import StatusMessage from '../components/StatusMessage';
 import useShake from '../hooks/useShake';
 
 // Keeps only digits and formats them as DD/MM/YYYY while typing
@@ -46,7 +46,6 @@ export default function SignUpScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   const { shakeStyle, shake } = useShake();
 
@@ -60,11 +59,6 @@ export default function SignUpScreen({ navigation }) {
       'Data de nascimento',
       'Usamos sua data de nascimento para confirmar que você tem idade para usar o archv-rooms.'
     );
-  }
-
-  // After sign up, show the onboarding; it ends at the login screen
-  function goToOnboarding() {
-    navigation.navigate('Onboarding', { fromSignUp: true });
   }
 
   async function handleSignUp() {
@@ -81,16 +75,16 @@ export default function SignUpScreen({ navigation }) {
     }
 
     setError('');
-    setSuccess(false);
     setLoading(true);
 
     try {
-      await api.post(
+      const res = await api.post(
         '/auth/register',
         { name: name.trim(), username: username.trim(), email: email.trim(), password },
         { timeout: 90000 }
       );
-      setSuccess(true);
+      await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (err) {
       showError(getApiErrorMessage(err));
     } finally {
@@ -143,15 +137,6 @@ export default function SignUpScreen({ navigation }) {
           />
 
           {error !== '' && <Text style={[s.error, { textAlign: 'center' }]}>{error}</Text>}
-          {success && (
-            <StatusMessage
-              icon="checkmark-circle"
-              message="Conta criada! Já pode entrar com seu nick."
-              actionLabel="Continuar"
-              onAction={goToOnboarding}
-              style={{ marginBottom: 12 }}
-            />
-          )}
 
           <PrimaryButton label="Criar conta" onPress={handleSignUp} loading={loading} />
         </Animated.View>
