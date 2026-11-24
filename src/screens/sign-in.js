@@ -9,7 +9,7 @@ import PasswordField from '../components/PasswordField';
 import GithubLogin from '../components/GithubLogin';
 
 export default function SignInScreen({ navigation }) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -19,17 +19,17 @@ export default function SignInScreen({ navigation }) {
 
   async function handleLogin() {
     if (busy) return;
-    if (!email.trim() || !password) {
-      showAlert('Campos vazios', 'Preencha o e-mail e a senha para entrar.');
+    if (!username.trim() || !password) {
+      showAlert('Campos vazios', 'Preencha o nick e a senha para entrar.');
       return;
     }
     setBusy(true);
     try {
-      const res = await api.post('/auth/login', { email: email.trim(), password });
+      const res = await api.post('/auth/login', { username: username.trim(), password });
       await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
       goHome();
     } catch (e) {
-      showAlert('Erro', 'E-mail ou senha incorretos.');
+      showAlert('Erro', 'Nick ou senha incorretos.');
     }
     setBusy(false);
   }
@@ -52,11 +52,11 @@ export default function SignInScreen({ navigation }) {
 
       <FadeIn delay={100}>
         <AuthField
-          icon="mail-outline"
-          placeholder="E-mail"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
+          icon="at-outline"
+          placeholder="Nick"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
         />
         <PasswordField value={password} onChangeText={setPassword} onSubmitEditing={handleLogin} />
 

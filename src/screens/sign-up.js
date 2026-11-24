@@ -71,7 +71,7 @@ export default function SignUpScreen({ navigation }) {
     if (loading) return;
 
     if (!name.trim() || !username.trim() || !email.trim() || !password) {
-      showError('Preencha nome, username, e-mail e senha.');
+      showError('Preencha nome, nick, e-mail e senha.');
       return;
     }
 
@@ -109,7 +109,7 @@ export default function SignUpScreen({ navigation }) {
       <FadeIn delay={100}>
         <Animated.View style={shakeStyle}>
           <AuthField icon="person-outline" placeholder="Nome" value={name} onChangeText={setName} autoCapitalize="words" editable={!loading} />
-          <AuthField icon="at-outline" placeholder="Username" value={username} onChangeText={setUsername} editable={!loading} />
+          <AuthField icon="at-outline" placeholder="Nick" value={username} onChangeText={setUsername} autoCapitalize="none" editable={!loading} />
 
           {/* Date of birth is not sent to the API */}
           <AuthField
@@ -132,6 +132,7 @@ export default function SignUpScreen({ navigation }) {
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
+            autoCapitalize="none"
             editable={!loading}
           />
           <PasswordField
@@ -145,7 +146,7 @@ export default function SignUpScreen({ navigation }) {
           {success && (
             <StatusMessage
               icon="checkmark-circle"
-              message="Conta criada! Verifique seu e-mail para ativar a conta antes de entrar."
+              message="Conta criada! Já pode entrar com seu nick."
               actionLabel="Continuar"
               onAction={goToOnboarding}
               style={{ marginBottom: 12 }}
