@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as NavigationBar from 'expo-navigation-bar';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -43,6 +44,9 @@ const linking = {
 // Espaço reservado embaixo em todas as telas
 const TAB_BAR_SPACE = 96;
 
+// Telas que ocupam a tela inteira, sem espaço reservado embaixo
+const FULLSCREEN_ROUTES = ['Game'];
+
 // Tela que abre ao tocar na notificação, conforme o tipo
 const PUSH_SCREEN = {
   message: 'Friends',
@@ -51,10 +55,23 @@ const PUSH_SCREEN = {
   room_full: 'Rooms',
 };
 
+// Esconde a barra de navegação do Android (voltar, início, recentes)
+async function hideAndroidBar() {
+  if (Platform.OS !== 'android') return;
+  try {
+    await NavigationBar.setVisibilityAsync('hidden');
+  } catch (e) {}
+}
+
 export default function App() {
   const [currentRoute, setCurrentRoute] = useState('SignIn');
   const usernameChecked = useRef(false);
   const pushRegistered = useRef(false);
+
+  // Esconde a barra do Android ao abrir o app
+  useEffect(() => {
+    hideAndroidBar();
+  }, []);
 
   // Ao tocar numa notificação, abre a tela correspondente
   useEffect(() => {
@@ -100,6 +117,9 @@ export default function App() {
     if (!route) return;
     setCurrentRoute(route.name);
 
+    // Garante que a barra do Android continue escondida a cada tela
+    hideAndroidBar();
+
     if (route.name === 'Home') {
       if (await needsUsername()) {
         navigationRef.reset({ index: 0, routes: [{ name: 'ChooseUsername' }] });
@@ -128,6 +148,8 @@ export default function App() {
     navigationRef.reset({ index: 0, routes: [{ name: 'SignIn' }] });
   }
 
+  const fullscreen = FULLSCREEN_ROUTES.includes(currentRoute);
+
   return (
     <AlertProvider>
       <NavigationContainer
@@ -139,8 +161,8 @@ export default function App() {
         <View
           style={{
             flex: 1,
-            backgroundColor: '#14111F',
-            paddingBottom: TAB_BAR_SPACE,
+            backgroundColor: fullscreen ? '#000' : '#14111F',
+            paddingBottom: fullscreen ? 0 : TAB_BAR_SPACE,
           }}
         >
           <Stack.Navigator
