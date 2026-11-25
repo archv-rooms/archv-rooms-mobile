@@ -5,7 +5,8 @@ import { Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold } from '@exp
 import { COLORS, authStyles } from './auth-kit';
 
 // Background, fonts, keyboard and scroll shared by the auth screens
-export default function AuthLayout({ children }) {
+// fixed: a tela não "balança" quando o conteúdo cabe; só rola se o teclado cobrir
+export default function AuthLayout({ children, fixed = false }) {
   const [fontsReady] = useFonts({ Rajdhani_500Medium, Rajdhani_600SemiBold, Rajdhani_700Bold });
 
   if (!fontsReady) return <View style={{ flex: 1, backgroundColor: COLORS.bgTop }} />;
@@ -14,9 +15,11 @@ export default function AuthLayout({ children }) {
     <View style={{ flex: 1, backgroundColor: COLORS.bgTop }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={authStyles.container}
+          contentContainerStyle={fixed ? [authStyles.container, { flexGrow: 1, justifyContent: 'center' }] : authStyles.container}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={!fixed}
+          overScrollMode={fixed ? 'never' : 'auto'}
         >
           {children}
         </ScrollView>

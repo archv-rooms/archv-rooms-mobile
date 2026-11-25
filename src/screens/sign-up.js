@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, Animated, Pressable } from 'react-native';
+import { Text, Image, Animated, Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api, { TOKEN_KEY } from '../services/api';
@@ -61,6 +61,10 @@ export default function SignUpScreen({ navigation }) {
     );
   }
 
+  function goHome() {
+    navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+  }
+
   async function handleSignUp() {
     if (loading) return;
 
@@ -84,7 +88,7 @@ export default function SignUpScreen({ navigation }) {
         { timeout: 90000 }
       );
       await AsyncStorage.setItem(TOKEN_KEY, res.data.data.token);
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      goHome();
     } catch (err) {
       showError(getApiErrorMessage(err));
     } finally {
@@ -93,22 +97,36 @@ export default function SignUpScreen({ navigation }) {
   }
 
   return (
-    <AuthLayout>
-      <FadeIn style={[s.header, { marginBottom: 24 }]}>
-        <Image source={require('../../assets/logo.png')} style={[s.logo, { width: 72, height: 72 }]} resizeMode="contain" />
+    <AuthLayout fixed>
+      <FadeIn style={[s.header, { marginBottom: 12 }]}>
+        <Image source={require('../../assets/logo.png')} style={[s.logo, { width: 56, height: 56 }]} resizeMode="contain" />
         <Text style={s.title}>Criar conta</Text>
-        <Text style={s.subtitle}>Entre no Archv Rooms e comece a jogar</Text>
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
+          <Text style={s.footerText}>Já tem conta?</Text>
+          <Pressable onPress={() => navigation.navigate('SignIn')}>
+            <Text style={s.footerLink}>Entrar</Text>
+          </Pressable>
+        </View>
       </FadeIn>
 
       <FadeIn delay={100}>
         <Animated.View style={shakeStyle}>
           <AuthField icon="person-outline" placeholder="Nome" value={name} onChangeText={setName} autoCapitalize="words" editable={!loading} />
           <AuthField icon="at-outline" placeholder="Nick" value={username} onChangeText={setUsername} autoCapitalize="none" editable={!loading} />
+          <AuthField
+            icon="mail-outline"
+            placeholder="E-mail"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            editable={!loading}
+          />
 
           {/* Date of birth is not sent to the API */}
           <AuthField
             icon="calendar-outline"
-            placeholder="Data de nascimento (DD/MM/AAAA)"
+            placeholder="Nascimento (DD/MM/AAAA)"
             value={birthDate}
             onChangeText={(text) => setBirthDate(formatBirthDate(text))}
             keyboardType="number-pad"
@@ -120,15 +138,6 @@ export default function SignUpScreen({ navigation }) {
             }
           />
 
-          <AuthField
-            icon="mail-outline"
-            placeholder="E-mail"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            editable={!loading}
-          />
           <PasswordField
             value={password}
             onChangeText={setPassword}
@@ -142,20 +151,13 @@ export default function SignUpScreen({ navigation }) {
         </Animated.View>
       </FadeIn>
 
-      <Text style={{ fontFamily: FONT.normal, color: COLORS.muted, textAlign: 'center', fontSize: 14, marginTop: 14 }}>
+      <FadeIn delay={200}>
+        <GithubLogin spacing={14} onSuccess={goHome} />
+      </FadeIn>
+
+      <Text style={{ fontFamily: FONT.normal, color: COLORS.muted, textAlign: 'center', fontSize: 12, marginTop: 12 }}>
         Ao continuar, você concorda com os Termos e a Política de Privacidade.
       </Text>
-
-      <FadeIn delay={200}>
-        <GithubLogin spacing={20} />
-      </FadeIn>
-
-      <FadeIn delay={280} style={[s.footer, { marginTop: 24 }]}>
-        <Text style={s.footerText}>Já tem conta?</Text>
-        <Pressable onPress={() => navigation.navigate('SignIn')}>
-          <Text style={s.footerLink}>Entrar</Text>
-        </Pressable>
-      </FadeIn>
     </AuthLayout>
   );
 }

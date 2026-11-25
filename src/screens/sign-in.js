@@ -48,7 +48,12 @@ export default function SignInScreen({ navigation }) {
       <FadeIn style={s.header}>
         <Image source={require('../../assets/logo.png')} style={s.logo} resizeMode="contain" />
         <Text style={s.title}>Bem-vindo de volta</Text>
-        <Text style={s.subtitle}>Entre para continuar jogando</Text>
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
+          <Text style={s.footerText}>Não tem conta?</Text>
+          <Pressable onPress={() => navigation.navigate('SignUp')}>
+            <Text style={s.footerLink}>Criar conta</Text>
+          </Pressable>
+        </View>
       </FadeIn>
 
       <FadeIn delay={100}>
@@ -72,7 +77,7 @@ export default function SignInScreen({ navigation }) {
       </FadeIn>
 
       <FadeIn delay={200}>
-        <GithubLogin spacing={24} onSuccess={goHome} />
+        <GithubLogin spacing={16} onSuccess={goHome} />
       </FadeIn>
 
       <FadeIn delay={240}>
@@ -81,15 +86,6 @@ export default function SignInScreen({ navigation }) {
           onPress={handleGuest}
         >
           <Text style={s.link}>Jogar como convidado</Text>
-        </Pressable>
-      </FadeIn>
-
-      <View style={{ flex: 1, minHeight: 24 }} />
-
-      <FadeIn delay={280} style={s.footer}>
-        <Text style={s.footerText}>Não tem conta?</Text>
-        <Pressable onPress={() => navigation.navigate('SignUp')}>
-          <Text style={s.footerLink}>Criar conta</Text>
         </Pressable>
       </FadeIn>
     </AuthLayout>

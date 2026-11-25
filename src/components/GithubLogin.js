@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, FONT, PressableScale, authStyles as s } from './auth-kit';
+import { COLORS, PressableScale, authStyles as s } from './auth-kit';
 import { showAlert } from './AppModal';
 import { TOKEN_KEY } from '../services/api';
 
@@ -37,21 +37,18 @@ async function loginWithProvider(provider, label, onSuccess) {
 }
 
 const buttonStyle = {
-  flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: 10,
-  height: 54,
-  borderRadius: 27,
+  width: 52,
+  height: 52,
+  borderRadius: 26,
   backgroundColor: COLORS.surface,
   borderWidth: 1,
   borderColor: 'rgba(255,255,255,0.08)',
 };
 
-const labelStyle = { fontFamily: FONT.semi, color: '#fff', fontSize: 18 };
-
-// "ou" divider + Continue with Google and GitHub buttons
-export default function GithubLogin({ onSuccess, spacing = 24 }) {
+// Divisor "ou" + botões redondos do Google e do GitHub
+export default function GithubLogin({ onSuccess, spacing = 16 }) {
   return (
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: spacing }}>
@@ -60,25 +57,23 @@ export default function GithubLogin({ onSuccess, spacing = 24 }) {
         <View style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.12)' }} />
       </View>
 
-      <PressableScale
-        onPress={() => loginWithProvider('google', 'Google', onSuccess)}
-        style={buttonStyle}
-        scale={0.96}
-      >
-        <Ionicons name="logo-google" size={20} color="#fff" />
-        <Text style={labelStyle}>Continuar com Google</Text>
-      </PressableScale>
+      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
+        <PressableScale
+          onPress={() => loginWithProvider('google', 'Google', onSuccess)}
+          style={buttonStyle}
+          scale={0.92}
+        >
+          <Ionicons name="logo-google" size={22} color="#fff" />
+        </PressableScale>
 
-      <View style={{ height: 12 }} />
-
-      <PressableScale
-        onPress={() => loginWithProvider('github', 'GitHub', onSuccess)}
-        style={buttonStyle}
-        scale={0.96}
-      >
-        <Ionicons name="logo-github" size={20} color="#fff" />
-        <Text style={labelStyle}>Continuar com GitHub</Text>
-      </PressableScale>
+        <PressableScale
+          onPress={() => loginWithProvider('github', 'GitHub', onSuccess)}
+          style={buttonStyle}
+          scale={0.92}
+        >
+          <Ionicons name="logo-github" size={22} color="#fff" />
+        </PressableScale>
+      </View>
     </>
   );
 }
