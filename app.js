@@ -27,6 +27,7 @@ import BottomTabBar from './src/components/BottomTabBar';
 import { AlertProvider } from './src/components/AppModal';
 import api, { TOKEN_KEY } from './src/services/api';
 import { registerForPush } from './src/services/push';
+import { BG_BOTTOM } from './src/constants/palette';
 
 const Stack = createNativeStackNavigator();
 const navigationRef = createNavigationContainerRef();
@@ -41,10 +42,11 @@ const linking = {
   },
 };
 
-// Espaço reservado embaixo em todas as telas
+// Espaço reservado embaixo, só nas telas em que a barra aparece
 const TAB_BAR_SPACE = 96;
+const TAB_ROUTES = ['Home', 'Friends', 'Rooms', 'Settings', 'About', 'Ranking'];
 
-// Telas que ocupam a tela inteira, sem espaço reservado embaixo
+// Telas que ocupam a tela inteira
 const FULLSCREEN_ROUTES = ['Game'];
 
 // Tela que abre ao tocar na notificação, conforme o tipo
@@ -149,6 +151,7 @@ export default function App() {
   }
 
   const fullscreen = FULLSCREEN_ROUTES.includes(currentRoute);
+  const hasTabBar = TAB_ROUTES.includes(currentRoute);
 
   return (
     <AlertProvider>
@@ -161,8 +164,8 @@ export default function App() {
         <View
           style={{
             flex: 1,
-            backgroundColor: fullscreen ? '#000' : '#14111F',
-            paddingBottom: fullscreen ? 0 : TAB_BAR_SPACE,
+            backgroundColor: fullscreen ? '#000' : BG_BOTTOM,
+            paddingBottom: hasTabBar ? TAB_BAR_SPACE : 0,
           }}
         >
           <Stack.Navigator
